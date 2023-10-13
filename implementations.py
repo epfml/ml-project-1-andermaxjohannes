@@ -194,7 +194,7 @@ def least_squares(y,tx): # Required function #3
 
 
 ########## Ridge regression using normal equations ##########
-'I am unsure about this implementation, it might be wack'
+
 def ridge_regression(y, tx, lambda_): # Required function #4
     ''' Implement ridge regression for the normal equations
     Args:
@@ -212,7 +212,7 @@ def ridge_regression(y, tx, lambda_): # Required function #4
     (tx.T @ tx + n*lambda*I) @ beta^hat(lambda) = tx.T @ y
     where n =len(y), and I is the identity matrix
     """
-    w = np.linalg.solve(len(y) * lambda_ * np.identity(tx.shape[1]) + tx.T@tx , tx.T@y)  # Computing w by way of the normal equations
+    w = np.linalg.solve(2 * len(y) * lambda_ * np.identity(tx.shape[1]) + tx.T@tx , tx.T@y)  # Computing w by way of the normal equations
     return w, compute_loss(y,tx,w)
 
 
