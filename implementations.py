@@ -174,6 +174,7 @@ def mse_sgd_momentum(y, tx, initial_w, max_iters, gamma, batch_size=1, beta=0.5)
         batch_y, batch_x = mini_batch(y,tx,batch_size) # Extracting a batch of x's and corresponding y's
         m = beta * m + (1-beta) * compute_mse_gradient(batch_y,batch_x,w) # Updating the momentum by a linear combination of the current gradient and the former step
         w -= gamma * m # Updating w by a step in the negative momentum direction
+        #print(f'{n+1}/{max_iters}: w: {w}')
         
     return w, compute_loss(y,tx,w) # Returning the final loss and the final parameters
 
@@ -237,7 +238,7 @@ def compute_logistic_loss(y, tx, w):
     Returns:
         Float denoting the logistic loss
     '''
-    return np.sum(y * w.T@tx  +  np.log10(logistic_function(-w.T@tx)))
+    return np.sum(y * tx@w  +  np.log10(logistic_function(-w.T@tx)))
 
 def compute_logistic_gradient(y, tx, w):
     ''' Computing the gradient of the logistic function, sum_{i=1}^n((y_i - logistic(w.T x_i)) x_i)
@@ -248,7 +249,7 @@ def compute_logistic_gradient(y, tx, w):
     Returns:
         (d,) array with the logistic gradient
     '''
-    return np.sum((y-logistic_function(w.T@tx)) * tx, axis=0)
+    return np.sum(tx.T @ (y-logistic_function(tx@w)), axis=0)
 
 def logistic_regression(y, tx, initial_w, max_iters, gamma): # Required function #5
     ''' Gradient descent with logistic loss
@@ -269,7 +270,7 @@ def logistic_regression(y, tx, initial_w, max_iters, gamma): # Required function
         grad = compute_logistic_gradient(y,tx,w)
         w -= gamma * grad
     
-    return w, compute_logistic_loss(y,tx,w)
+    return w#, compute_logistic_loss(y,tx,w)
 
 
 
