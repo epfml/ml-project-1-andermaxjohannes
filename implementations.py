@@ -237,7 +237,11 @@ def compute_logistic_loss(y, tx, w):
     Returns:
         Float denoting the logistic loss
     '''
-    return np.sum(y * w.T@tx  +  np.log10(logistic_function(-w.T@tx)))
+    first_term = y.T@np.log(logistic_function(tx@w))
+    log_term = (1-y).T@np.log(1-logistic_function(tx@w))
+    loss = -(1/np.shape(y)[0])*np.sum(first_term+log_term)
+    return loss
+    #return np.sum(y * w.T@tx  +  np.log10(logistic_function(-w.T@tx)))
 
 def compute_logistic_gradient(y, tx, w):
     ''' Computing the gradient of the logistic function, sum_{i=1}^n((y_i - logistic(w.T x_i)) x_i)
@@ -248,7 +252,9 @@ def compute_logistic_gradient(y, tx, w):
     Returns:
         (d,) array with the logistic gradient
     '''
-    return np.sum((y-logistic_function(w.T@tx)) * tx, axis=0)
+    grad = (1/np.shape(y)[0])*tx.T@(logistic_function(tx@w)-y)
+    return grad
+    #return np.sum((y-logistic_function(w.T@tx)) * tx, axis=0)
 
 def logistic_regression(y, tx, initial_w, max_iters, gamma): # Required function #5
     ''' Gradient descent with logistic loss
@@ -275,6 +281,105 @@ def logistic_regression(y, tx, initial_w, max_iters, gamma): # Required function
 
 
 ########## Regularized logistic regression using gradient descent or SGD (y ∈ {0,1}, with regularization term λ∥w∥2) ##########
+def penalized_logistic_regression(y, tx, w, lambda_):
+    """return the loss and gradient.
+
+    Args:
+        y:  shape=(N, 1)
+        tx: shape=(N, D)
+        w:  shape=(D, 1)
+        lambda_: scalar
+
+    Returns:
+        loss: scalar number
+        gradient: shape=(D, 1)
+
+    >>> y = np.c_[[0., 1.]]
+    >>> tx = np.arange(6).reshape(2, 3)
+    >>> w = np.array([[0.1], [0.2], [0.3]])
+    >>> lambda_ = 0.1
+    >>> loss, gradient = penalized_logistic_regression(y, tx, w, lambda_)
+    >>> round(loss, 8)
+    0.63537268
+    >>> gradient
+    array([[-0.08370763],
+           [ 0.2467104 ],
+           [ 0.57712843]])
+    """
+    # ***************************************************
+    # INSERT YOUR CODE HERE
+    # return loss, gradient: TODO
+    grad = compute_logistic_gradient(y,tx,w)
+    loss = compute_logistic_loss(y,tx,w)
+    
+    loss_pen = loss+lambda_*np.sum(w.T@w)
+    grad_pen = grad+lambda_*np.abs(w)*2
+        
+    return loss_pen,grad_pen
 
 def reg_logistic_regression(y, tx, lambda_ ,initial_w, max_iters, gamma): # Required function #6
-    pass
+    """return the loss and updated w.
+
+    Args:
+        y:  shape=(N, 1)
+        tx: shape=(N, D)
+        w:  shape=(D, 1)
+        lambda_: scalar
+
+    Returns:
+        loss: scalar number
+        gradient: shape=(D, 1)
+
+    >>> y = np.c_[[0., 1.]]
+    >>> tx = np.arange(6).reshape(2, 3)
+    >>> w = np.array([[0.1], [0.2], [0.3]])
+    >>> lambda_ = 0.1
+    >>> loss, gradient = penalized_logistic_regression(y, tx, w, lambda_)
+    >>> round(loss, 8)
+    0.63537268
+    >>> gradient
+    array([[-0.08370763],
+           [ 0.2467104 ],
+           [ 0.57712843]])
+    """
+    # ***************************************************
+    # INSERT YOUR CODE HERE
+    w = np.array(initial_w,dtype=float)
+
+    for n in range(max_iters):
+        loss_pen, grad_pen = penalized_logistic_regression(y, tx, w, lambda_)
+        w -= gamma * grad_pen
+    
+    return w, loss_pen
+    #pass
+
+def calculate_hessian(y, tx, w):
+    """return the Hessian of the loss function.
+
+    Args:
+        y:  shape=(N, 1)
+        tx: shape=(N, D)
+        w:  shape=(D, 1)
+
+    Returns:
+        a hessian matrix of shape=(D, D)
+
+    >>> y = np.c_[[0., 1.]]
+    >>> tx = np.arange(6).reshape(2, 3)
+    >>> w = np.array([[0.1], [0.2], [0.3]])
+    >>> calculate_hessian(y, tx, w)
+    array([[0.28961235, 0.3861498 , 0.48268724],
+           [0.3861498 , 0.62182124, 0.85749269],
+           [0.48268724, 0.85749269, 1.23229813]])
+    """
+    # ***************************************************
+    # INSERT YOUR CODE HERE
+    # calculate Hessian: TODO
+    #print('shape tx: ',np.shape(tx),'shape w: ',np.shape(w), np.shape(tx@w),np.shape(sigmoid(tx@w)))
+    sig = logistic_function(tx@w)
+    
+    S = np.diag(sig-sig@sig.T)
+    
+    hess = (1/np.shape(y)[0])*(tx.T@np.diag(S)@tx)
+    
+    return hess
