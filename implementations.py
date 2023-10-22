@@ -220,62 +220,72 @@ def ridge_regression(y, tx, lambda_): # Required function #4
 
 ########## Logistic regression using gradient descent or SGD (y ∈ {0,1}) ##########
 
-def logistic_function(z):
-    ''' The logistic function dependent on z, often called the sigmoid function
+def logistic(z):
+    """ Applies the logistic (also called sigmoid) function on z
     Args:
-        z: Array-like
+        z: (N,) array
     Returns:
-        Array-like of same dimensions as the input, 
-    '''
-    return 1/(1+np.exp(-z)) # Calculating and returning the logistic function
+        (n,) array
+    """
+    return 1/(1+np.exp(-z))
 
-def compute_logistic_loss(y, tx, w):
-    ''' Computing the logistic loss, defined as sum_{i=1}^n(y_i w.T x_i + log(logistic(-w.T x_i)))
+def logistic_loss(y, tx, w):
+    """ Compute the cost by negative log likelihood.
     Args:
-        y: (N,) array of labels
-        tx: (N,d) array of samples and their features
-        w: (d,) arry of the parameters
+        y: (N,) array with labels
+        tx: (N,D) array with samples and their features
+        w: (D,) array with the parameters
     Returns:
-        Float denoting the logistic loss
-    '''
-    return np.sum(y * tx@w  +  np.log10(logistic_function(-w.T@tx)))
+        float non-negative loss
+    """
+    return - np.sum( y * np.log(logistic(tx @ w)) + (1-y)* np.log(1-logistic(tx @ w)) ) / y.shape[0]
 
-def compute_logistic_gradient(y, tx, w):
-    ''' Computing the gradient of the logistic function, sum_{i=1}^n((y_i - logistic(w.T x_i)) x_i)
+def logistic_gradient(y, tx, w):
+    """ Compute the gradient of the logistic loss
     Args:
-        y: (N,) array of labels
-        tx: (N,d) array of samples and their features
-        w: (d,) arry of the parameters
+        y: (N,) array with labels
+        tx: (N,D) array with samples and their features
+        w: (D,) array with the parameters
     Returns:
-        (d,) array with the logistic gradient
-    '''
-    return np.sum(tx.T @ (y-logistic_function(tx@w)), axis=0)
+        (D, 1) array with the gradient of the logistic loss with respect to the parameters
+    """
+    return tx.T @ (logistic(tx@w)-y) / y.shape[0]
 
-def logistic_regression(y, tx, initial_w, max_iters, gamma): # Required function #5
-    ''' Gradient descent with logistic loss
+def logistic_regression(y, tx, initial_w, max_iters, gamma):
+    ''' Use logistic regression for binary clasification
     Args:
-        y: (N,) array of labels
-        tx: (N,d) array of samples and their features
-        initial_w: (d,) array of initialization values for the parameters
-        max_iters: Integer denoting the maximum number of GD steps
-        gamma: Float denoting the step size
-    Returns:
-        w: (d,) array with the final parameters
-        loss: Float denoting the final logistic loss
+        y: (N,) array with labels
+        tx: (N,D) array with samples and their features
+        initial_w: (D,) array with some initial parameters
+        max_iters: integer of the maximum number of iterations
+        gamma: float of the step length
+    Return:
+        w: The final parameters
+        loss: The final loss
     '''
-    # Initializing w
-    w = np.array(initial_w,dtype=float)
-
-    for n in range(max_iters):
-        grad = compute_logistic_gradient(y,tx,w)
-        w -= gamma * grad
+    w = initial_w
+    for i in range(max_iters):
+        w += -gamma * logistic_gradient(y,tx,w)
     
-    return w#, compute_logistic_loss(y,tx,w)
-
-
-
+    return w, logistic_loss(y,tx,w)
 
 ########## Regularized logistic regression using gradient descent or SGD (y ∈ {0,1}, with regularization term λ∥w∥2) ##########
 
 def reg_logistic_regression(y, tx, lambda_ ,initial_w, max_iters, gamma): # Required function #6
-    pass
+    ''' Perform regularized logistic regression for binary classification
+    Args:
+        y: (N,) array with labels
+        tx: (N,D) array with samples and their features
+        lambda_: float of the penalization parameter
+        initial_w: (D,) array with some initial parameters
+        max_iters: integer of the maximum number of iterations
+        gamma: float of the step length
+    Returns:
+        w: The final parameters
+        loss: The final loss
+    '''
+    w = initial_w
+    for i in range(max_iters):
+        w += -gamma * (logistic_gradient(y,tx,w) + 2*lambda_*w) # Updating the paramters by the gradient with the regularization term
+    
+    return w, logistic_loss(y,tx,w)
