@@ -230,25 +230,28 @@ def logistic(z):
     return 1/(1+np.exp(-z))
 
 def logistic_loss(y, tx, w):
-    """ Compute the cost by negative log likelihood.
+    ''' Compute the cost by negative log likelihood.
     Args:
         y: (N,) array with labels
         tx: (N,D) array with samples and their features
         w: (D,) array with the parameters
     Returns:
         float non-negative loss
-    """
-    return - np.sum( y * np.log(logistic(tx @ w)) + (1-y)* np.log(1-logistic(tx @ w)) ) / y.shape[0]
+    '''
+    first_term = y.T@np.log(logistic(tx@w))
+    log_term = (1-y).T@np.log(1-logistic(tx@w))
+    return -np.sum(first_term+log_term) / y.shape[0]
+    # return - np.sum( y * np.log(logistic(tx @ w)) + (1-y)* np.log(1-logistic(tx @ w)) ) / y.shape[0]
 
 def logistic_gradient(y, tx, w):
-    """ Compute the gradient of the logistic loss
+    ''' Compute the gradient of the logistic loss
     Args:
         y: (N,) array with labels
         tx: (N,D) array with samples and their features
         w: (D,) array with the parameters
     Returns:
         (D, 1) array with the gradient of the logistic loss with respect to the parameters
-    """
+    '''
     return tx.T @ (logistic(tx@w)-y) / y.shape[0]
 
 def logistic_regression(y, tx, initial_w, max_iters, gamma):
@@ -265,11 +268,30 @@ def logistic_regression(y, tx, initial_w, max_iters, gamma):
     '''
     w = np.array(initial_w, dtype=float)
     for i in range(max_iters):
-        w += -gamma * logistic_gradient(y,tx,w)
+        w -= gamma * logistic_gradient(y,tx,w)
     
     return w, logistic_loss(y,tx,w)
 
 ########## Regularized logistic regression using gradient descent or SGD (y ∈ {0,1}, with regularization term λ∥w∥2) ##########
+
+def penalized_logistic_regression(y, tx, w, lambda_):
+    """return the loss and gradient.
+    Args:
+        y:  shape=(N, 1)
+        tx: shape=(N, D)
+        w:  shape=(D, 1)
+        lambda_: scalar
+    Returns:
+        loss: scalar number
+        gradient: shape=(D, 1)
+    """
+    grad = logistic_gradient(y,tx,w)
+    loss = logistic_loss(y,tx,w)
+    
+    loss_pen = loss+lambda_*np.sum(w.T@w)
+    grad_pen = grad+lambda_*np.abs(w)*2
+        
+    return loss_pen,grad_pen
 
 def reg_logistic_regression(y, tx, lambda_ ,initial_w, max_iters, gamma): # Required function #6
     ''' Perform regularized logistic regression for binary classification
@@ -285,11 +307,31 @@ def reg_logistic_regression(y, tx, lambda_ ,initial_w, max_iters, gamma): # Requ
         loss: The final loss
     '''
     w = np.array(initial_w, dtype=float)
-    for i in range(max_iters):
-        w += -gamma * (logistic_gradient(y,tx,w) + 2*lambda_*w) # Updating the paramters by the gradient with the regularization term
-    
-    return w, logistic_loss(y,tx,w)
 
+    for n in range(max_iters):
+        #loss_pen, grad_pen = penalized_logistic_regression(y, tx, w, lambda_)
+        w -= gamma * logistic_gradient(y,tx,w) + 2*lambda_*np.abs(w) # Updating the paramters by the gradient with the regularization term
+    
+    loss = logistic_loss(y,tx,w)
+    return w, loss
+
+def calculate_hessian(y, tx, w):
+    """ Return the Hessian of the loss function.
+    Args:
+        y:  (N, 1)
+        tx: (N, D)
+        w:  (D, 1)
+    Returns:
+        (D,D) array of the hessian matrix
+    logisticDiag = np.diag((logistic * (1-logistic)).flatten()) 
+    """
+    sig = logistic(tx@w)
+    
+    S = np.diag(sig-sig@sig.T)
+    
+    hess = (1/np.shape(y)[0])*(tx.T@np.diag(S)@tx)
+    
+    return hess
 
 
 ########## Data cleaning functions ##########
