@@ -263,7 +263,7 @@ def logistic_regression(y, tx, initial_w, max_iters, gamma):
         w: The final parameters
         loss: The final loss
     '''
-    w = initial_w
+    w = np.array(initial_w, dtype=float)
     for i in range(max_iters):
         w += -gamma * logistic_gradient(y,tx,w)
     
@@ -284,8 +284,110 @@ def reg_logistic_regression(y, tx, lambda_ ,initial_w, max_iters, gamma): # Requ
         w: The final parameters
         loss: The final loss
     '''
-    w = initial_w
+    w = np.array(initial_w, dtype=float)
     for i in range(max_iters):
         w += -gamma * (logistic_gradient(y,tx,w) + 2*lambda_*w) # Updating the paramters by the gradient with the regularization term
     
     return w, logistic_loss(y,tx,w)
+
+
+
+########## Data cleaning functions ##########
+
+def removeBadFeatures(x,xHeader,threshold=0.7):
+    ''' Function checking how many features have more than {threshold} parts valid entries, and removing the 'bad' features with less than {threshold} valid entries
+    Args:
+        x: (N,d) array of the dataset
+        xHeader: (d,) array of the header for the dataset
+        threshold: float between 0 and 1
+    Returns:
+        (N,d-b) array of the new dataset, where b is the number of features with less than threshold parts valid entries
+        (d-b) array of the new header, where b is the number of features with less than threshold parts valid entries
+    '''
+    # Counting the number of valid values for each feature, and calculating the percentage of valid entries
+    validFeatureVals = x.count(axis=0) # The number of valid entries for each feature
+    validFeatureValsPercent = validFeatureVals/x.shape[0] # The percentage of valid entries for each feature
+
+    # Finding the indices of all the features with number of features above and below a threeshold
+    featureIndicesAboveThreeshold = np.argwhere(validFeatureValsPercent > threshold).flatten() # Finding the indices where there are more than threeshold percent valid entries
+    
+    # Printing the good vs bad features
+    print(f'For a threshold of {threshold}, there are {len(featureIndicesAboveThreeshold)} good features, and {x.shape[1]-len(featureIndicesAboveThreeshold)} bad features')
+
+    # Removing the features that appears less than {threeshold} of the time, and returning the others
+    return x[:,featureIndicesAboveThreeshold], xHeader[featureIndicesAboveThreeshold]
+
+
+def removeBadSamples(y,x,acceptableMissingValues):
+    ''' Function checking how many samples miss more than {acceptableMissingValues} values, and removing those samples
+    Args:
+        y: (N,) array of the labels
+        x: (N,d) array of the data
+        acceptableMissingValues: integer between 0 and d
+    Returns:
+        (N-b) array of the new labels, where b is the number of samples missing more than {acceptableMissingValues}
+        (N-b,d) array of the new dataset, where b is the number of samples missing more than {acceptableMissingValues}
+    '''
+    # Counting the number of remaining valid entries for each sample
+    validSampleVals = x.count(axis=1)
+
+    # Find the indices of the samples with more than {acceptableMissingValues} invalid missing
+    sampleIndicesAboveThreeshold = np.argwhere(validSampleVals >= x.shape[1]-acceptableMissingValues).flatten()
+    print(f'There remains in the data {len(sampleIndicesAboveThreeshold)} samples with at most {acceptableMissingValues} missing values')
+
+    # Removing samples with more than {acceptableMissingValues} missing values
+    return y[sampleIndicesAboveThreeshold], x[sampleIndicesAboveThreeshold]
+
+
+def standardizeData(x):
+    ''' Function for standardizing the data
+    Args:
+        x: (N,d) array
+    Returns:
+        (N,d) array where x has been subtracted its mean, and divided by its standard deviation
+    '''
+    return (x - np.mean(x, axis=0)) / np.std(x, axis=0) # Subtract the mean and divide by the standard deviation
+
+def balanceData(y,x):
+    ''' Function for balancing the number of positive and negative cases in the dataset for regression, which may help find real correlations instead of just guessing based on the prior
+    Args:
+        y: (N,) array with labels
+        x: (N,d) array with data
+    Returns:
+        (N_b,) array with labels, where N_b is min(positiveCase, negativeCases) *2
+        (N_b,d) array with the balanced data
+    '''
+    # Extracting the indices of the positive and negative cases, bundling them in a tuple, and bundling their lengths in tuples
+    positiveCases = np.where(y == 1)[0]
+    negativeCases = np.where(y == -1)[0]
+    casesIndices = (positiveCases,negativeCases)
+    casesLengths = (len(positiveCases),len(negativeCases))
+
+    # Finding which subset is the smallest and largest (aka are there more negative or positive cases), and setting the smallestSubsetLength to the length of the smallest subset
+    smallestSubset = np.argmin(casesLengths)
+    largestSubset = np.argmax(casesLengths)
+    smallestSubsetLength = casesLengths[smallestSubset]
+
+    # Storing the cases from the smallest subset in an array
+    balancedY = np.zeros(smallestSubsetLength*2)
+    balancedX = np.zeros((smallestSubsetLength*2,x.shape[1]))
+    balancedY[:smallestSubsetLength] = (y[casesIndices[smallestSubset]]).flatten()
+    balancedX[:smallestSubsetLength] = x[casesIndices[smallestSubset]]
+
+    # Randomly choosing as many samples from the largest subset as there are in the smallest subset, and storing them in the balanced array
+    randomSampleIndices = np.random.permutation(casesLengths[largestSubset])[:smallestSubsetLength]
+    balancedX[smallestSubsetLength:] = (x[casesIndices[largestSubset]])[randomSampleIndices]
+    balancedY[smallestSubsetLength:] = ((y[casesIndices[largestSubset]])[randomSampleIndices]).flatten()
+
+    # Shuffling the balanced arrays so no model can learn to classify the entries by their position in the dataset
+    shufflingIndices = np.random.permutation(balancedY.shape[0])
+    shuffledBalancedX = balancedX[shufflingIndices]
+    shuffledBalancedY = balancedY[shufflingIndices]
+
+    return shuffledBalancedY, shuffledBalancedX
+
+def makeTrainingData(x):
+    ''' Function filling the invalid values with the mean (zero), and adding a dummy variable'''
+    xClean = np.ma.filled(x,fill_value=0) # Replace the invalid entries by zeros (aka the mean)
+    tx = np.c_[np.ones(xClean.shape[0]),xClean] # Adding a dummy feature
+    return np.nan_to_num(tx) # For some reason, not all NaN values were filled with zeros, this should rectify that problem

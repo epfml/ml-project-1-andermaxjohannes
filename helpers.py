@@ -3,24 +3,17 @@ import csv
 import numpy as np
 
 
-def load_csv_data(data_path, sub_sample=False):
-    """Loads data and returns y (class labels), tX (features) and ids (event ids)"""
-    y = np.genfromtxt(data_path, delimiter=",", skip_header=1, dtype=str, usecols=1)
-    x = np.genfromtxt(data_path, delimiter=",", skip_header=1)
-    ids = x[:, 0].astype(np.int)
-    input_data = x[:, 2:]
-
-    # convert class labels from strings to binary (-1,1)
-    yb = np.ones(len(y))
-    yb[np.where(y == "b")] = -1
-
-    # sub-sample
-    if sub_sample:
-        yb = yb[::50]
-        input_data = input_data[::50]
-        ids = ids[::50]
-
-    return yb, input_data, ids
+def loadData(dataPath):
+    ''' Loads data and returns it as masked numpy array. A masked array contains information about which values are invalid, ensuring methods like .mean() ignores the masked values
+    Args:
+        dataPath: The file path of the data
+    Returns:
+        data: (N,d) masked numpy array, where N is the number of samples, and d is the dimension of the x values, or 1 if the data in question are the labels
+        header: (d,) array with the column names
+    '''
+    data = np.genfromtxt(dataPath, delimiter=',', skip_header=1, dtype=float, usemask=True) # Loading the data as a masked array (with usemask=True), skipping the header, and specifying that the values are floats
+    header = np.genfromtxt(dataPath, delimiter=',', dtype=str, max_rows=1) # Loading the first row of the csv file, i.e. the header
+    return data , header
 
 
 def create_csv_submission(ids, y_pred, name):
