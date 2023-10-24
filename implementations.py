@@ -238,10 +238,11 @@ def logistic_loss(y, tx, w):
     Returns:
         float non-negative loss
     '''
+    #return np.sum(np.log( 1 + np.exp(-y * (tx@w))))
     first_term = y.T@np.log(logistic(tx@w))
     log_term = (1-y).T@np.log(1-logistic(tx@w))
-    return -np.sum(first_term+log_term) / y.shape[0]
-    # return - np.sum( y * np.log(logistic(tx @ w)) + (1-y)* np.log(1-logistic(tx @ w)) ) / y.shape[0]
+    return -first_term+log_term[0,0] / y.shape[0]
+    #return - np.sum( y * np.log(logistic(tx @ w)) + (1-y)* np.log(1-logistic(tx @ w)) ) / y.shape[0]
 
 def logistic_gradient(y, tx, w):
     ''' Compute the gradient of the logistic loss
@@ -333,6 +334,34 @@ def calculate_hessian(y, tx, w):
     
     return hess
 
+
+########## Loading data ##########
+
+def loadData(dataPath):
+    ''' Loads data and returns it as masked numpy array. A masked array contains information about which values are invalid, ensuring methods like .mean() ignores the masked values
+    Args:
+        dataPath: The file path of the data
+    Returns:
+        data: (N,d) masked numpy array, where N is the number of samples, and d is the dimension of the x values, or 1 if the data in question are the labels
+        header: (d,) array with the column names
+    '''
+    data = np.genfromtxt(dataPath, delimiter=',', skip_header=1, dtype=float, usemask=True) # Loading the data as a masked array (with usemask=True), skipping the header, and specifying that the values are floats
+    header = np.genfromtxt(dataPath, delimiter=',', dtype=str, max_rows=1) # Loading the first row of the csv file, i.e. the header
+    return data , header
+
+def loadTrainingData():
+    ''' Loads the medical training data and nothing else. Wrapper function
+    Returns:
+        X, xHeader, Y, yHeader, indexedX, indexedXheader, indexedY, indexedYheader
+    '''
+    x, xHeader = loadData('./Data/x_train.csv')
+    y, yHeader = loadData('./Data/y_train.csv')
+    unIndexedX, unIndexedXHeader = x[:,1:], xHeader[1:]
+    unIndexedY, unIndexedYHeader = y[:,1:], yHeader[1:]
+
+    print(f'Data successfully loaded, there are {unIndexedX.shape[1]} features and {y.shape[0]} samples, the shapes of the unindexed data is:\ny: {unIndexedY.shape}, x: {unIndexedX.shape}')
+
+    return unIndexedX, unIndexedXHeader, unIndexedY, unIndexedYHeader, x, xHeader, y, yHeader
 
 ########## Data cleaning functions ##########
 
@@ -426,12 +455,14 @@ def balanceData(y,x):
     shuffledBalancedX = balancedX[shufflingIndices]
     shuffledBalancedY = balancedY[shufflingIndices]
 
+    print(f'Created a balanced subset of the data, with {2*smallestSubsetLength} samples, {smallestSubsetLength} each of positive and negative samples')
     return shuffledBalancedY, shuffledBalancedX
 
 def makeTrainingData(x):
     ''' Function filling the invalid values with the mean (zero), and adding a dummy variable'''
     xClean = np.ma.filled(x,fill_value=0) # Replace the invalid entries by zeros (aka the mean)
     tx = np.c_[np.ones(xClean.shape[0]),xClean] # Adding a dummy feature
+    print('Added dummy variable and replaced invalid entries with zeros')
     return np.nan_to_num(tx) # For some reason, not all NaN values were filled with zeros, this should rectify that problem
 
 def detectOutliers(y, x, outlierThreshold=10):
@@ -463,6 +494,7 @@ def dataCleaning(y,x,xHeader,featureThreshold=0.7,acceptableMissingValues=5):
 
     # Standardizing the data by subtraction of the mean and dividing by the standard deviation
     xStandardized = standardizeData(xOutliersRemoved)
+    print('Standardized data by subtracting the mean and dividing by the standard deviation')
 
     return yOutliersRemoved, xStandardized, xHeaderFeaturesRemoved
 
