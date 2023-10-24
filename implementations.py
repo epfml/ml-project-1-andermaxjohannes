@@ -433,3 +433,19 @@ def makeTrainingData(x):
     xClean = np.ma.filled(x,fill_value=0) # Replace the invalid entries by zeros (aka the mean)
     tx = np.c_[np.ones(xClean.shape[0]),xClean] # Adding a dummy feature
     return np.nan_to_num(tx) # For some reason, not all NaN values were filled with zeros, this should rectify that problem
+
+def dataCleaning(y,x,xHeader,featureThreshold=0.7,acceptableMissingValues=5):
+    # Removing bad features and samples
+    xFeaturesRemoved, xHeaderFeaturesRemoved = removeBadFeatures(x,xHeader,featureThreshold)
+    ySamplesRemoved, xSamplesRemoved = removeBadSamples(y,xFeaturesRemoved,acceptableMissingValues)
+    print(f'The number of invalid entries remaing in the dataset is {xSamplesRemoved.size - xSamplesRemoved.count()}\nThat is {(xSamplesRemoved.size - xSamplesRemoved.count())/xSamplesRemoved.size} parts of the whole dataset')
+    
+    # Removing outliers
+    yOutliersRemoved, xOutliersRemoved = detectOutliers(ySamplesRemoved,xSamplesRemoved)
+
+    # Standardizing the data by subtraction of the mean and dividing by the standard deviation
+    xStandardized = standardizeData(xOutliersRemoved)
+
+    return yOutliersRemoved, xStandardized, xHeaderFeaturesRemoved
+
+
