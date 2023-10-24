@@ -434,6 +434,24 @@ def makeTrainingData(x):
     tx = np.c_[np.ones(xClean.shape[0]),xClean] # Adding a dummy feature
     return np.nan_to_num(tx) # For some reason, not all NaN values were filled with zeros, this should rectify that problem
 
+def detectOutliers(y, x, outlierThreshold=10):
+    xStandardized = standardizeData(x)
+
+    stdAwayFromMean = np.abs(xStandardized)
+
+    # Assuming normal distribution, approx 68% of the data falls within 1 std, 95% within 2 std, 99.7% within 3 std
+    # Therefore one may consider any entries in stdAwayFromMean > {outlierThreeshold=3} to be outliers - except that the data is not neccesarily normally distributed, so the threshold should be higher
+    inlierRows = np.where(np.all(stdAwayFromMean < outlierThreshold, axis=1))[0]
+    
+    outlierRows = np.where(np.any(stdAwayFromMean > outlierThreshold, axis=1))[0]
+    #print(outlierRows.shape)
+    #print(inlierRows.shape)
+    #print(x.shape)
+
+    print(f'Removed {len(outlierRows)} samples with outliers more than {outlierThreshold} standard deviations from the mean. There remains {len(inlierRows)} samples in the dataset.')
+
+    return y[inlierRows], x[inlierRows]
+
 def dataCleaning(y,x,xHeader,featureThreshold=0.7,acceptableMissingValues=5):
     # Removing bad features and samples
     xFeaturesRemoved, xHeaderFeaturesRemoved = removeBadFeatures(x,xHeader,featureThreshold)
