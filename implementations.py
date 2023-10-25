@@ -241,7 +241,7 @@ def logistic_loss(y, tx, w):
     #return np.sum(np.log( 1 + np.exp(-y * (tx@w))))
     first_term = y.T@np.log(logistic(tx@w))
     log_term = (1-y).T@np.log(1-logistic(tx@w))
-    return -first_term+log_term[0,0] / y.shape[0]
+    return -np.sum(first_term+log_term) / y.shape[0]
     #return - np.sum( y * np.log(logistic(tx @ w)) + (1-y)* np.log(1-logistic(tx @ w)) ) / y.shape[0]
 
 def logistic_gradient(y, tx, w):
@@ -356,12 +356,13 @@ def loadTrainingData():
     '''
     x, xHeader = loadData('./Data/x_train.csv')
     y, yHeader = loadData('./Data/y_train.csv')
+    y[y == -1] = 0
     unIndexedX, unIndexedXHeader = x[:,1:], xHeader[1:]
     unIndexedY, unIndexedYHeader = y[:,1:], yHeader[1:]
 
     print(f'Data successfully loaded, there are {unIndexedX.shape[1]} features and {y.shape[0]} samples, the shapes of the unindexed data is:\ny: {unIndexedY.shape}, x: {unIndexedX.shape}')
 
-    return unIndexedX, unIndexedXHeader, unIndexedY, unIndexedYHeader, x, xHeader, y, yHeader
+    return unIndexedX, unIndexedXHeader, unIndexedY.flatten(), unIndexedYHeader, x, xHeader, y, yHeader
 
 ########## Data cleaning functions ##########
 
@@ -430,7 +431,7 @@ def balanceData(y,x):
     '''
     # Extracting the indices of the positive and negative cases, bundling them in a tuple, and bundling their lengths in tuples
     positiveCases = np.where(y == 1)[0]
-    negativeCases = np.where(y == -1)[0]
+    negativeCases = np.where(y == 0)[0]
     casesIndices = (positiveCases,negativeCases)
     casesLengths = (len(positiveCases),len(negativeCases))
 
