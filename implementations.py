@@ -499,4 +499,57 @@ def dataCleaning(y,x,xHeader,featureThreshold=0.7,acceptableMissingValues=5):
 
     return yOutliersRemoved, xStandardized, xHeaderFeaturesRemoved
 
+########## K Fold Cross Validation #########
 
+def k_fold_cross_validation_sets(y,x,K):
+    ''' Function for making K separate training sets out of the provided dataset
+    Args:
+        y: (N,) array of the labels
+        x: (N,d) array of the data with its features
+        K: Integer number of separate trainingsets
+    Yields:
+        y_k: (N/K,) array of the chosen labels. N/K is N//K + 1 for the first sets, and N//K for the rest of the sets
+        x_k: (N/K,d) array of the data
+    '''
+    N = len(y)      # Saving the number of samples as an integer
+    batchSize = N // K  # Calculating the batch size
+    residual = N - K*batchSize  # Checking how many samples would not be included in sets of size N//K
+
+    indices = np.random.permutation(N) # Randomly permuted indices of the provided dataset
+    
+    for k in range(K):
+        if k < residual: # If the samples 'in' the residual has not 'been used', we include them
+            indices_k = indices[k*(batchSize+1):(k+1)*(batchSize+1)] # Indices of the elements for each k batch. Here included one extra samples 'from' the residual
+        else:
+            indices_k = indices[residual+k*batchSize:residual+(k+1)*batchSize] # Indices of the elements for each k batch
+        
+        yield y[indices_k], x[indices_k] # Yield returns the first set, and next time the function is called the code continues, so the for loop repeats and yields the next set
+
+def k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma, regressionFunction=logistic_regression, lossFunction=logistic_loss):
+    ''' Performing regression on K separate subsets of the provided training set, and returning the average parameters
+    Args:
+        y: (N,) array of the labels
+        tx: (N,d) array of the data and its features
+        initital_w: (d,) array with some initialization of the parameters
+        max_iters: integer of the maximum iterations per regression
+        gamma: float of the step size
+        regressionFunction: The function of the chosen type of regression
+        lossFunction: The function of the chosen type of loss
+    Returns:
+        w_avg: (d,) array of the resultant parameters averaged over the cross validation runs
+    ''' 
+    crossValidationSets = k_fold_cross_validation_sets(y,tx,K)
+    
+    w, loss = np.zeros((K,tx.shape[1])), np.zeros(K)
+    
+    for k in range(K):
+        y_k, tx_k = next(crossValidationSets)
+
+        w[k], loss[k] = regressionFunction(y_k, tx_k, initial_w, max_iters, gamma)
+
+        print(f'Run {k+1} yielded a loss improvement from {lossFunction(y_k,tx_k,initial_w)} to {lossFunction(y_k,tx_k,w[k])}')
+    w_avg = np.sum(w,axis=0) / K
+    
+    print(f'''-----------------------------------------------------------------------------------------
+Averaging the parameters, the loss improves from {lossFunction(y,tx,initial_w)} to {lossFunction(y,tx,w_avg)}''')
+    return w_avg
