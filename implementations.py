@@ -569,7 +569,7 @@ def max_k_fold_cross_valid_sets(y,k_fold):
     #print(np.array(k_indices))
     return np.array(k_indices)
 
-def max_cross_valid(y, x, k_indices, k_fold, lambda_, degree):
+def max_cross_valid(y, x, k_indices, k_fold, lambda_, regressionFunction=logistic_regression):
     """return the loss of ridge regression for a fold corresponding to k_indices
 
     Args:
