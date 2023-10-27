@@ -600,10 +600,10 @@ def makePredictions(w,xTest,xHeader,xHeaderFeaturesRemoved, prior=1.0):
 
 def calculate_recall(y_true, y_predicted):
     true_positives = 0
-    false_positives = 0
+    false_negatives = 0
     for i in y_true:
         if i == 1 and y_predicted == 1:
             true_positives += 1
         if i == 1 and y_predicted == 0:
-            false_positives += 1
-    return true_positives / (true_positives + false_positives)
+            false_negatives += 1
+    return true_positives / (true_positives + false_negatives)
