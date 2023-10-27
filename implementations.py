@@ -594,3 +594,16 @@ def makePredictions(w,xTest,xHeader,xHeaderFeaturesRemoved, prior=1.0):
     predictionSet = makeTrainingData(removedFeaturesX)
     probabilities = prior * logistic(predictionSet@w) # The prob of the model being applicable times the prob from the model
     return (np.sign(probabilities-0.5)+1)/2 # Shifting the probs to be negative for negative preds, and vice versa, taking the sign, shifting the preds up to be zero or two, diving by to so the preds are zero or one
+
+
+######## Calculating the recall of our prediction #####################
+
+def calculate_recall(y_true, y_predicted):
+    true_positives = 0
+    false_positives = 0
+    for i in y_true:
+        if i == 1 and y_predicted == 1:
+            true_positives += 1
+        if i == 1 and y_predicted == 0:
+            false_positives += 1
+    return true_positives / (true_positives + false_positives)
