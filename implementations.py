@@ -19,17 +19,6 @@ def MSE(e):
     Returns:
         Float value of the mean squared error'''
     return e.T @ e / len(e)
-
-"""
-def MAE(e): # Not used for now at least
-    '''
-    Calculates the mean absolute error of the submitted error-array
-    Args:
-        e: (N,) array of the error fr all N predictions
-    Returns:
-        Float value of the mean absolute error'''
-    return np.sum(np.abs(e)) / len(e)
-"""
     
 def compute_loss(y, tx, w, lossFunction=MSE):
     """Calculate the loss using either MSE or MAE.
@@ -102,19 +91,6 @@ def mse_gd_momentum(y, tx, initial_w, max_iters, gamma, beta=0.5):
 
 
 ########## Linear regression using stochastic gradient descent ##########
-
-'''
-def compute_stoch_gradient(y,tx, w):
-    """Compute a stochastic gradient at w from a data sample batch of size B, where B < N, and their corresponding labels.
-    Args:
-        y: (B,) array of labels
-        tx: (B,d) array of samples and their features
-        w: (d,) array of model parameters
-    Returns:
-        (d,) array containing a stochastic gradient at w
-    """
-    return - tx.T @ (y - tx @ w) / len(y)
-'''
 
 def mini_batch(y,tx,B):
     '''Extract B random labels and their corresponding samples
@@ -192,8 +168,6 @@ def least_squares(y,tx): # Required function #3
     w = np.linalg.solve(tx.T@tx,tx.T@y)
     return w, compute_loss(y,tx,w)
 
-
-
 ########## Ridge regression using normal equations ##########
 
 def ridge_regression(y, tx, lambda_): # Required function #4
@@ -216,8 +190,6 @@ def ridge_regression(y, tx, lambda_): # Required function #4
     w = np.linalg.solve(2 * len(y) * lambda_ * np.identity(tx.shape[1]) + tx.T@tx , tx.T@y)  # Computing w by way of the normal equations
     return w, compute_loss(y,tx,w)
 
-
-
 ########## Logistic regression using gradient descent or SGD (y ∈ {0,1}) ##########
 
 def logistic(z):
@@ -238,6 +210,7 @@ def logistic_loss(y, tx, w):
     Returns:
         float non-negative loss
     '''
+    return np.sum(-y * (tx@w) + np.log(1+np.exp(tx@w))) / y.shape[0]
     #return np.sum(np.log( 1 + np.exp(-y * (tx@w))))
     first_term = y.T@np.log(logistic(tx@w))
     log_term = (1-y).T@np.log(1-logistic(tx@w))
@@ -275,6 +248,18 @@ def logistic_regression(y, tx, initial_w, max_iters, gamma):
 
 ########## Regularized logistic regression using gradient descent or SGD (y ∈ {0,1}, with regularization term λ∥w∥2) ##########
 
+def penalized_logistic_loss(y, tx, w, lambda_):
+    ''' Function calculating the penalized logistic loss
+    Args:
+        y:  (N,) array
+        tx: (N,d) array
+        w:  (d,) array
+        lambda_: float
+    Returns:
+        loss: float, penalized logistic loss
+    '''
+    return logistic_loss(y, tx, w) + lambda_ * np.sum(w.T@w)
+
 def penalized_logistic_regression(y, tx, w, lambda_):
     """return the loss and gradient.
     Args:
@@ -311,7 +296,7 @@ def reg_logistic_regression(y, tx, lambda_ ,initial_w, max_iters, gamma): # Requ
 
     for n in range(max_iters):
         #loss_pen, grad_pen = penalized_logistic_regression(y, tx, w, lambda_)
-        w -= gamma * logistic_gradient(y,tx,w) + 2*lambda_*np.abs(w) # Updating the paramters by the gradient with the regularization term
+        w -= gamma * (logistic_gradient(y,tx,w) + 2*lambda_*np.abs(w)) # Updating the paramters by the gradient with the regularization term
     
     loss = logistic_loss(y,tx,w)
     return w, loss
@@ -333,7 +318,6 @@ def calculate_hessian(y, tx, w):
     hess = (1/np.shape(y)[0])*(tx.T@np.diag(S)@tx)
     
     return hess
-
 
 ########## Loading data ##########
 
@@ -391,7 +375,6 @@ def removeBadFeatures(x,xHeader,threshold=0.7):
     # Removing the features that appears less than {threeshold} of the time, and returning the others
     return x[:,featureIndicesAboveThreeshold], xHeader[featureIndicesAboveThreeshold], xHeader[featureIndicesBeneathThreeshold]
 
-
 def removeBadSamples(y,x,acceptableMissingValues):
     ''' Function checking how many samples miss more than {acceptableMissingValues} values, and removing those samples
     Args:
@@ -411,7 +394,6 @@ def removeBadSamples(y,x,acceptableMissingValues):
 
     # Removing samples with more than {acceptableMissingValues} missing values
     return y[sampleIndicesAboveThreeshold], x[sampleIndicesAboveThreeshold]
-
 
 def standardizeData(x):
     ''' Function for standardizing the data
@@ -518,19 +500,19 @@ def dataCleaning(y,x,xHeader,featureThreshold=0.7,acceptableMissingValues=5):
 
     return yOutliersRemoved, xStandardized, xHeaderFeaturesRemoved, removedFeatures
 
-
-
 ########## K Fold Cross Validation #########
 
 def k_fold_cross_validation_sets(y,x,K):
-    ''' Function for making K separate training sets out of the provided dataset
+    ''' Function for making K separate testing and training sets out of the provided dataset
     Args:
         y: (N,) array of the labels
         x: (N,d) array of the data with its features
         K: Integer number of separate trainingsets
     Yields:
-        y_k: (N/K,) array of the chosen labels. N/K is N//K + 1 for the first sets, and N//K for the rest of the sets
-        x_k: (N/K,d) array of the data
+        y_k_test: (N/K,) array of the chosen labels. N/K is N//K + 1 for the first sets, and N//K for the rest of the sets
+        x_k_test: (N/K,d) array of the data
+        y_k_train: (N * (K-1)/K,) array of the chosen labels
+        x_k_train: (N * (K-1)/K,d) array of the data
     '''
     N = len(y)      # Saving the number of samples as an integer
     batchSize = N // K  # Calculating the batch size
@@ -544,7 +526,10 @@ def k_fold_cross_validation_sets(y,x,K):
         else:
             indices_k = indices[residual+k*batchSize:residual+(k+1)*batchSize] # Indices of the elements for each k batch
         
-        yield y[indices_k], x[indices_k] # Yield returns the first set, and next time the function is called the code continues, so the for loop repeats and yields the next set
+        mask = np.ones(len(y), dtype=bool)  # Creating a mask to be able to extract the 
+        mask[indices_k] = False             # samples not specified by indices_k
+        
+        yield y[indices_k], x[indices_k], y[mask], x[mask]  # Yield returns the first set, and next time the function is called the code continues, so the for loop repeats and yields the next set
 
 def k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma, regressionFunction=logistic_regression, lossFunction=logistic_loss):
     ''' Performing regression on K separate subsets of the provided training set, and returning the average parameters
@@ -557,23 +542,24 @@ def k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma, regressionFunction
         regressionFunction: The function of the chosen type of regression
         lossFunction: The function of the chosen type of loss
     Returns:
-        w_avg: (d,) array of the resultant parameters averaged over the cross validation runs
+        w: (d,) array of the average parameters
+        train_loss: float of the average train loss
+        test_loss: float of the average test loss
     ''' 
-    crossValidationSets = k_fold_cross_validation_sets(y,tx,K)
+    crossValidationSets = k_fold_cross_validation_sets(y,tx,K) # Creating a generator of the cross validation sets
     
-    w, loss = np.zeros((K,tx.shape[1])), np.zeros(K)
+    w, train_loss, test_loss = np.zeros((K,initial_w.size)), np.zeros(K), np.zeros(K)
     
     for k in range(K):
-        y_k, tx_k = next(crossValidationSets)
+        y_k_test, tx_k_test, y_k_train, tx_k_train = next(crossValidationSets)
 
-        w[k], loss[k] = regressionFunction(y_k, tx_k, initial_w, max_iters, gamma)
+        w[k], train_loss[k] = regressionFunction(y_k_train, tx_k_train, initial_w, max_iters, gamma)
+        test_loss[k] = lossFunction(y_k_test,tx_k_test,w[k])
 
-        print(f'Run {k+1} yielded a loss improvement from {lossFunction(y_k,tx_k,initial_w)} to {lossFunction(y_k,tx_k,w[k])}')
-    w_avg = np.sum(w,axis=0) / K
     
-    print(f'''-----------------------------------------------------------------------------------------
-Averaging the parameters, the loss improves from {lossFunction(y,tx,initial_w)} to {lossFunction(y,tx,w_avg)}''')
-    return w_avg, lossFunction(y_k,tx_k,initial_w)
+
+    #print(f'The best test loss achieved  was {test_loss[best_loss_index]}')
+    return np.mean(w,axis=0), np.mean(train_loss), np.mean(test_loss) # Returning the average parameters, training and testing losses
 
 
 ########## Making final predictions ##########
@@ -594,3 +580,35 @@ def makePredictions(w,xTest,xHeader,xHeaderFeaturesRemoved, prior=1.0):
     predictionSet = makeTrainingData(removedFeaturesX)
     probabilities = prior * logistic(predictionSet@w) # The prob of the model being applicable times the prob from the model
     return (np.sign(probabilities-0.5)+1)/2 # Shifting the probs to be negative for negative preds, and vice versa, taking the sign, shifting the preds up to be zero or two, diving by to so the preds are zero or one
+
+
+########### Hyperparameter tuning ###########
+
+def determineLambda(y,tx,initial_w,lambdas, max_iters, K, gamma):
+    ''' Function testing what lambda yields, on average, the best result with k cross validation
+    Args:
+        y: (N,) array of the labels
+        tx: (N,d) array of the data and its features
+        initital_w: (d,) array with some initialization of the parameters
+        lambdas: (l,) array of l different lambdas
+        max_iters: integer, maximum number of iterations
+        K: integer, number of folds
+        gamma: float, step size
+    Returns:
+        train_loss: (l,) array of the average training losses for each lambda
+        test_loss: (l,) array of the average training losses for each lambda
+        best_lambda: float, the lambda giving the smallest test loss
+        best_w: (d,) array of the parameters giving the smallest test loss
+    '''
+    # Initializing the parameters, and arrays to store testing and training losses
+    w_reg_logistic = np.zeros((len(lambdas),len(initial_w)),dtype=float)
+    test_loss, train_loss = np.zeros(len(lambdas)), np.zeros(len(lambdas))
+
+    for i,l in enumerate(lambdas): # Iterating over the provided lambdas
+        # Making a regularized regression function with a fixed lambda that takes in 
+        # only (y, tx, initial_w, max_iters, gamma), which is what is required by our k_fold_cross_validation function
+        reg_logistic_regression_fixed_lambda = lambda y, tx, initial_w, max_iters, gamma: reg_logistic_regression(y,tx,l,initial_w,max_iters,gamma)
+        # Performing the cross validation and saving the average parameters, training and testing losses
+        w_reg_logistic[i], train_loss[i], test_loss[i] = k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma,reg_logistic_regression_fixed_lambda)
+    bestLambdaIndex = np.argmin(test_loss) # Finding for which lambda the best testing loss was acquired
+    return train_loss, test_loss, lambdas[bestLambdaIndex], w_reg_logistic[bestLambdaIndex]
