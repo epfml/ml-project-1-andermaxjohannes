@@ -374,7 +374,8 @@ def removeBadFeatures(x,xHeader,threshold=0.7):
         threshold: float between 0 and 1
     Returns:
         (N,d-b) array of the new dataset, where b is the number of features with less than threshold parts valid entries
-        (d-b) array of the new header, where b is the number of features with less than threshold parts valid entries
+        (d-b,) array of the new header, where b is the number of features with less than threshold parts valid entries
+        (b,) array with the removed features
     '''
     # Counting the number of valid values for each feature, and calculating the percentage of valid entries
     validFeatureVals = x.count(axis=0) # The number of valid entries for each feature
@@ -382,12 +383,13 @@ def removeBadFeatures(x,xHeader,threshold=0.7):
 
     # Finding the indices of all the features with number of features above and below a threeshold
     featureIndicesAboveThreeshold = np.argwhere(validFeatureValsPercent > threshold).flatten() # Finding the indices where there are more than threeshold percent valid entries
-    
+    featureIndicesBeneathThreeshold = np.argwhere(validFeatureValsPercent < threshold).flatten()
+
     # Printing the good vs bad features
     print(f'For a threshold of {threshold}, there are {len(featureIndicesAboveThreeshold)} good features, and {x.shape[1]-len(featureIndicesAboveThreeshold)} bad features')
 
     # Removing the features that appears less than {threeshold} of the time, and returning the others
-    return x[:,featureIndicesAboveThreeshold], xHeader[featureIndicesAboveThreeshold]
+    return x[:,featureIndicesAboveThreeshold], xHeader[featureIndicesAboveThreeshold], xHeader[featureIndicesBeneathThreeshold]
 
 
 def removeBadSamples(y,x,acceptableMissingValues):
@@ -457,7 +459,11 @@ def balanceData(y,x):
     shuffledBalancedY = balancedY[shufflingIndices]
 
     print(f'Created a balanced subset of the data, with {2*smallestSubsetLength} samples, {smallestSubsetLength} each of positive and negative samples')
-    return shuffledBalancedY, shuffledBalancedX
+    
+    ### Models trained from this dataset will overestimate the probability of positive (or negative) cases,
+    ### therefore we should use some bayesian probabilities to update probabilities
+    prior = 2*smallestSubsetLength/len(y) # The probability of a random sample being in the balanced data
+    return shuffledBalancedY, shuffledBalancedX, prior
 
 def makeTrainingData(x):
     ''' Function filling the invalid values with the mean (zero), and adding a dummy variable'''
@@ -485,8 +491,21 @@ def detectOutliers(y, x, outlierThreshold=10):
     return y[inlierRows], x[inlierRows]
 
 def dataCleaning(y,x,xHeader,featureThreshold=0.7,acceptableMissingValues=5):
+    ''' Function for removing features with to few valid entries, samples with to few valid entries, samples with outliers, and standardizing the data.
+    Args: 
+        y: (N,) array of the labels
+        x: (N,d) array of the samples and their features
+        xHeader: (d,) array of the feature titles
+        featureThreshold: float between 0 and 1 of the percent of a features entries must be valid to keep the feature
+        acceptableMissingValues: integer of the number of entries for each feature that may be invalid entries
+    Returns:
+        (N-c) array of labels, where c is the number of samples with too many missing entries, plus the number of samples with outliers
+        (N-c,d-b) array of the data, where b is the number of removed features
+        (d-b,) array of the feature titles
+        (b,) array of the removed feature titles
+    '''
     # Removing bad features and samples
-    xFeaturesRemoved, xHeaderFeaturesRemoved = removeBadFeatures(x,xHeader,featureThreshold)
+    xFeaturesRemoved, xHeaderFeaturesRemoved, removedFeatures = removeBadFeatures(x,xHeader,featureThreshold)
     ySamplesRemoved, xSamplesRemoved = removeBadSamples(y,xFeaturesRemoved,acceptableMissingValues)
     print(f'The number of invalid entries remaing in the dataset is {xSamplesRemoved.size - xSamplesRemoved.count()}\nThat is {(xSamplesRemoved.size - xSamplesRemoved.count())/xSamplesRemoved.size} parts of the whole dataset')
     
@@ -497,7 +516,9 @@ def dataCleaning(y,x,xHeader,featureThreshold=0.7,acceptableMissingValues=5):
     xStandardized = standardizeData(xOutliersRemoved)
     print('Standardized data by subtracting the mean and dividing by the standard deviation')
 
-    return yOutliersRemoved, xStandardized, xHeaderFeaturesRemoved
+    return yOutliersRemoved, xStandardized, xHeaderFeaturesRemoved, removedFeatures
+
+
 
 ########## K Fold Cross Validation #########
 
@@ -552,4 +573,24 @@ def k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma, regressionFunction
     
     print(f'''-----------------------------------------------------------------------------------------
 Averaging the parameters, the loss improves from {lossFunction(y,tx,initial_w)} to {lossFunction(y,tx,w_avg)}''')
-    return w_avg
+    return w_avg, lossFunction(y_k,tx_k,initial_w)
+
+
+########## Making final predictions ##########
+
+def makePredictions(w,xTest,xHeader,xHeaderFeaturesRemoved, prior=1.0):
+    ''' Function making predictions based on provided parameters and data
+    Args:
+        w: (d,) array with the parameters
+        x: (N,D) array with the data
+        xHeader: (D,) array with all the features
+        xHeader: (d,) array with the features that are actually used
+        prior: float denoting the probability of a random sample being in the model training data
+    Returns:
+        (N,) boolean array of the predictions
+    '''
+    standardX = standardizeData(xTest)
+    removedFeaturesX = standardX[:,np.nonzero(np.isin(xHeader, xHeaderFeaturesRemoved))[0]]
+    predictionSet = makeTrainingData(removedFeaturesX)
+    probabilities = prior * logistic(predictionSet@w) # The prob of the model being applicable times the prob from the model
+    return (np.sign(probabilities-0.5)+1)/2 # Shifting the probs to be negative for negative preds, and vice versa, taking the sign, shifting the preds up to be zero or two, diving by to so the preds are zero or one
