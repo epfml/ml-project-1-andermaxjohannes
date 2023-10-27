@@ -599,11 +599,20 @@ def makePredictions(w,xTest,xHeader,xHeaderFeaturesRemoved, prior=1.0):
 ######## Calculating the recall of our prediction #####################
 
 def calculate_recall(y_true, y_predicted):
+    ''' Function that calculates the recall of our prediction
+    Args:
+        y_true: (N,2) array with the actuall data
+        y_predicted: (N,2) array with the predicted y's
+    Returns:
+        a scalar that is the recall
+    '''
     true_positives = 0
     false_negatives = 0
-    for i in y_true:
-        if i == 1 and y_predicted == 1:
+    for i in range(len(y_true)):
+        true_label = y_true[i, 1]
+        pred_label = y_predicted[i, 1]
+        if true_label == 1 and pred_label == 1:
             true_positives += 1
-        if i == 1 and y_predicted == 0:
+        elif true_label == 1 and pred_label == 0:
             false_negatives += 1
     return true_positives / (true_positives + false_negatives)
