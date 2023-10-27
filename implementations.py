@@ -565,8 +565,10 @@ def k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma, regressionFunction
     
     for k in range(K):
         y_k, tx_k = next(crossValidationSets)
-
-        w[k], loss[k] = regressionFunction(y_k, tx_k, initial_w, max_iters, gamma)
+        if regressionFunction == ridge_regression:
+            w[k], loss[k] = regressionFunction(y_k, tx_k, gamma)
+        else:
+            w[k], loss[k] = regressionFunction(y_k, tx_k, initial_w, max_iters, gamma)
 
         print(f'Run {k+1} yielded a loss improvement from {lossFunction(y_k,tx_k,initial_w)} to {lossFunction(y_k,tx_k,w[k])}')
     w_avg = np.sum(w,axis=0) / K
