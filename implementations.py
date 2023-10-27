@@ -227,7 +227,7 @@ def logistic(z):
     Returns:
         (n,) array
     """
-    return 1/(1+np.exp(-z))
+    return (1 + np.exp(-z))**(-1)
 
 def logistic_loss(y, tx, w):
     ''' Compute the cost by negative log likelihood.
@@ -239,9 +239,12 @@ def logistic_loss(y, tx, w):
         float non-negative loss
     '''
     #return np.sum(np.log( 1 + np.exp(-y * (tx@w))))
+    #y[y==-1] = 0
     first_term = y.T@np.log(logistic(tx@w))
     log_term = (1-y).T@np.log(1-logistic(tx@w))
+    
     return -np.sum(first_term+log_term) / y.shape[0]
+    
     #return - np.sum( y * np.log(logistic(tx @ w)) + (1-y)* np.log(1-logistic(tx @ w)) ) / y.shape[0]
 
 def logistic_gradient(y, tx, w):
@@ -287,12 +290,12 @@ def penalized_logistic_regression(y, tx, w, lambda_):
         gradient: shape=(D, 1)
     """
     grad = logistic_gradient(y,tx,w)
-    loss = logistic_loss(y,tx,w)
+    #loss = logistic_loss(y,tx,w)
     
-    loss_pen = loss+lambda_*np.sum(w.T@w)
+    #loss_pen = loss+lambda_*np.sum(w.T@w)
     grad_pen = grad+lambda_*np.abs(w)*2
         
-    return loss_pen,grad_pen
+    return grad_pen
 
 def reg_logistic_regression(y, tx, lambda_ ,initial_w, max_iters, gamma): # Required function #6
     ''' Perform regularized logistic regression for binary classification
@@ -310,10 +313,10 @@ def reg_logistic_regression(y, tx, lambda_ ,initial_w, max_iters, gamma): # Requ
     w = np.array(initial_w, dtype=float)
 
     for n in range(max_iters):
-        #loss_pen, grad_pen = penalized_logistic_regression(y, tx, w, lambda_)
-        w -= gamma * logistic_gradient(y,tx,w) + 2*lambda_*np.abs(w) # Updating the paramters by the gradient with the regularization term
-    
+        loss, grad_pen = penalized_logistic_regression(y, tx, w, lambda_)
+        w = w - gamma*(grad_pen)
     loss = logistic_loss(y,tx,w)
+    #loss = logistic_loss(y,tx,w)
     return w, loss
 
 def calculate_hessian(y, tx, w):
@@ -569,7 +572,7 @@ def max_k_fold_cross_valid_sets(y,k_fold):
     #print(np.array(k_indices))
     return np.array(k_indices)
 
-def max_cross_valid(y, x, k_indices, k_fold, lambda_, regressionFunction=logistic_regression):
+def max_cross_valid(y, x, k_fold, initial_w,max_iter,gamma,lambda_, regressionFunction=reg_logistic_regression,lossFunction=logistic_loss):
     """return the loss of ridge regression for a fold corresponding to k_indices
 
     Args:
@@ -590,14 +593,12 @@ def max_cross_valid(y, x, k_indices, k_fold, lambda_, regressionFunction=logisti
     # ***************************************************
     # INSERT YOUR CODE HERE
     # get k'th subgroup in test, others in train: TODO
-    k_indices = max_k_fold_cross_valid_sets(y, k_fold
-                                           )
-   
-    
-    
-    w, loss = np.zeros((k_fold,tx.shape[1])), np.zeros(k_fold)
-    
+    loss_train_test = []
+    loss_tr_arr = []
+    loss_te_arr = []
     for k in range(k_fold):
+        k_indices = max_k_fold_cross_valid_sets(y, k_fold)
+        #print(np.shape(k_indices))
         test_ind = k_indices[k]
         train_ind = (k_indices[np.arange(len(k_indices))!=k]).flatten()
 
@@ -606,22 +607,27 @@ def max_cross_valid(y, x, k_indices, k_fold, lambda_, regressionFunction=logisti
 
         y_train = y[train_ind]
         y_test = y[test_ind]
-        
-        w[k], loss[k] = regressionFunction(y_test, x_test, initial_w, max_iters, gamma)
 
-        print(f'Run {k+1} yielded a loss improvement from {lossFunction(y_k,tx_k,initial_w)} to {lossFunction(y_k,tx_k,w[k])}')
-    w_avg = np.sum(w,axis=0) / K
+        if regressionFunction==reg_logistic_regression:
+            weights, loss_train = regressionFunction(y_train, x_train,lambda_, initial_w, max_iter, gamma)
+            
+        else:
+            weights, loss_train = regressionFunction(y_train, x_train, initial_w, max_iter, gamma)
+            
+        #print(weights)
+        loss_tr_test = lossFunction(y_train, x_train, weights)
+        loss_test = lossFunction(y_test, x_test, weights)
+       
+        loss_train_test.append(loss_tr_test)
+        loss_tr_arr.append(loss_train/k_fold)
+        loss_te_arr.append(loss_test/k_fold)
+        print(f'Run {k+1} yielded a loss improvement from {loss_train} to {loss_test}')
+        print('______________________')
     
-    print(f'''-----------------------------------------------------------------------------------------
-Averaging the parameters, the loss improves from {lossFunction(y,tx,initial_w)} to {lossFunction(y,tx,w_avg)}''')
-    return w_avg, lossFunction(y_k,tx_k,initial_w)
-    # ***************************************************
-    #raise NotImplementedError
-    # ***************************************************
-    # INSERT YOUR CODE HERE
-    # form data with polynomial degree: TODO
     
-    return loss_tr, loss_te
+  
+    return loss_tr_arr,loss_te_arr,loss_train_test
+   
 
 def k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma, regressionFunction=logistic_regression, lossFunction=logistic_loss):
     ''' Performing regression on K separate subsets of the provided training set, and returning the average parameters
