@@ -7,6 +7,7 @@ Any helper functions are sorted with the first function they are used for.
 '''
 ######### Importing Numpy ##########
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 ########## Linear regression using gradient descent ##########
@@ -18,7 +19,7 @@ def MSE(e):
         e: (N,) array of the error fr all N predictions
     Returns:
         Float value of the mean squared error'''
-    return e.T @ e / len(e)
+    return e.T @ e / (2*len(e))
     
 def compute_loss(y, tx, w, lossFunction=MSE):
     """Calculate the loss using either MSE or MAE.
@@ -61,7 +62,6 @@ def mean_squared_error_gd(y, tx, initial_w, max_iters, gamma): # Required functi
     for n in range(max_iters):
         grad = compute_mse_gradient(y,tx,w) * gamma # Updating w by a step in the negative gradient direction at the current w
         w -= grad
-        #print(f'w: {w}, grad: {grad}')
 
     return w, compute_loss(y,tx,w) # Returning the final loss and the final parameters
 
@@ -87,8 +87,6 @@ def mse_gd_momentum(y, tx, initial_w, max_iters, gamma, beta=0.5):
         w -= m * gamma # Updating w by a step in the negative momentum direction
 
     return w, compute_loss(y,tx,w) # Returning the final loss and the final parameters
-
-
 
 ########## Linear regression using stochastic gradient descent ##########
 
@@ -404,13 +402,14 @@ def standardizeData(x):
     '''
     return (x - np.mean(x, axis=0)) / np.std(x, axis=0) # Subtract the mean and divide by the standard deviation
 
-def balanceData(y,x):
+def balanceData(y,x,ratio=1):
     ''' Function for balancing the number of positive and negative cases in the dataset for regression, which may help find real correlations instead of just guessing based on the prior
     Args:
         y: (N,) array with labels
         x: (N,d) array with data
+        ratio: float denoting the ratio between the positive and negative samples (1:ratio, positive:negative) (Assuming there are more positive than negative cases, its the opposite if not)
     Returns:
-        (N_b,) array with labels, where N_b is min(positiveCase, negativeCases) *2
+        (N_b,) array with labels, where N_b is min(positiveCase, negativeCases) * (1+ratio)
         (N_b,d) array with the balanced data
     '''
     # Extracting the indices of the positive and negative cases, bundling them in a tuple, and bundling their lengths in tuples
@@ -424,14 +423,17 @@ def balanceData(y,x):
     largestSubset = np.argmax(casesLengths)
     smallestSubsetLength = casesLengths[smallestSubset]
 
+    # Calculating the number of samples in the largest subset
+    largestSubsetLength = np.round(smallestSubsetLength * ratio)
+
     # Storing the cases from the smallest subset in an array
-    balancedY = np.zeros(smallestSubsetLength*2)
-    balancedX = np.zeros((smallestSubsetLength*2,x.shape[1]))
+    balancedY = np.zeros(smallestSubsetLength+largestSubsetLength)
+    balancedX = np.zeros((smallestSubsetLength+largestSubsetLength,x.shape[1]))
     balancedY[:smallestSubsetLength] = (y[casesIndices[smallestSubset]]).flatten()
     balancedX[:smallestSubsetLength] = x[casesIndices[smallestSubset]]
 
     # Randomly choosing as many samples from the largest subset as there are in the smallest subset, and storing them in the balanced array
-    randomSampleIndices = np.random.permutation(casesLengths[largestSubset])[:smallestSubsetLength]
+    randomSampleIndices = np.random.permutation(casesLengths[largestSubset])[:largestSubsetLength]
     balancedX[smallestSubsetLength:] = (x[casesIndices[largestSubset]])[randomSampleIndices]
     balancedY[smallestSubsetLength:] = ((y[casesIndices[largestSubset]])[randomSampleIndices]).flatten()
 
@@ -440,12 +442,12 @@ def balanceData(y,x):
     shuffledBalancedX = balancedX[shufflingIndices]
     shuffledBalancedY = balancedY[shufflingIndices]
 
-    print(f'Created a balanced subset of the data, with {2*smallestSubsetLength} samples, {smallestSubsetLength} each of positive and negative samples')
+    print(f'Created a balanced subset of the data, with {smallestSubsetLength+largestSubsetLength} samples, {smallestSubsetLength} of positive and {largestSubsetLength} negative samples')
     
     ### Models trained from this dataset will overestimate the probability of positive (or negative) cases,
     ### therefore we should use some bayesian probabilities to update probabilities
     prior = 2*smallestSubsetLength/len(y) # The probability of a random sample being in the balanced data
-    return shuffledBalancedY, shuffledBalancedX, prior
+    return shuffledBalancedY, shuffledBalancedX
 
 def makeTrainingData(x):
     ''' Function filling the invalid values with the mean (zero), and adding a dummy variable'''
@@ -455,24 +457,58 @@ def makeTrainingData(x):
     return np.nan_to_num(tx) # For some reason, not all NaN values were filled with zeros, this should rectify that problem
 
 def detectOutliers(y, x, outlierThreshold=10):
-    xStandardized = standardizeData(x)
-
-    stdAwayFromMean = np.abs(xStandardized)
+    ''' Function checking the dataset for values exceeding {outlierThreshold} times the standard deviation, and removing the samples containing these values
+    Args:
+        y: (N,) array of the labels
+        x: (N,d) array of the data
+        outlierThreshold: integer of the number of feature standard deviations from the feature mean a value is allowed to be
+    Returns:
+        (N-o,) array of the labels without the outliers, where o is the number of samples with outliers
+        (N-o,d) array of the data
+    '''
+    # Finding the positive number of standard deviations away from the mean each value is
+    stdAwayFromMean = np.abs(standardizeData(x))
 
     # Assuming normal distribution, approx 68% of the data falls within 1 std, 95% within 2 std, 99.7% within 3 std
-    # Therefore one may consider any entries in stdAwayFromMean > {outlierThreeshold=3} to be outliers - except that the data is not neccesarily normally distributed, so the threshold should be higher
+    # Therefore one may consider any entries in stdAwayFromMean > {outlierThreeshold=3} to be outliers 
+    # - except that the data is not neccesarily normally distributed, so the threshold should be higher
     inlierRows = np.where(np.all(stdAwayFromMean < outlierThreshold, axis=1))[0]
     
     outlierRows = np.where(np.any(stdAwayFromMean > outlierThreshold, axis=1))[0]
-    #print(outlierRows.shape)
-    #print(inlierRows.shape)
-    #print(x.shape)
 
     print(f'Removed {len(outlierRows)} samples with outliers more than {outlierThreshold} standard deviations from the mean. There remains {len(inlierRows)} samples in the dataset.')
 
     return y[inlierRows], x[inlierRows]
 
-def dataCleaning(y,x,xHeader,featureThreshold=0.7,acceptableMissingValues=5):
+def inspectData(x,threshold=0.7):
+    ''' Plotting how many percent of the entries of each feature are valid/invalid
+    Args:
+        x: (N,d) array of the data
+    '''
+    dataSize = x.size
+    validEntries = x.count()
+
+    validFeatureVals = x.count(axis=0)
+    validFeatureParts = validFeatureVals/x.shape[0]
+
+    print(f'''Out of {dataSize} there are {validEntries} valid entries, that is {validEntries/dataSize} percent valid entries.''')
+    
+    plt.bar(np.arange(0,validFeatureParts.shape[0]),validFeatureParts)
+    plt.axhline(threshold, color='r')
+    plt.title('Parts valid entries per feature')
+    plt.show()
+
+    largestOutliers(x)
+
+def largestOutliers(x):
+    stdAwayFromMean = np.abs(standardizeData(x))
+    largestOutliers = np.max(stdAwayFromMean,axis=0)
+    largestOutliersFilled = np.ma.filled(largestOutliers,fill_value=0)
+    plt.bar(np.arange(0,x.shape[1]),largestOutliersFilled)
+    plt.title('Largest Outlier for each Feature')
+    plt.show()
+
+def dataCleaning(y,x,xHeader,featureThreshold=0.7,acceptableMissingValues=5, outlierThreshold=10):
     ''' Function for removing features with to few valid entries, samples with to few valid entries, samples with outliers, and standardizing the data.
     Args: 
         y: (N,) array of the labels
@@ -492,7 +528,7 @@ def dataCleaning(y,x,xHeader,featureThreshold=0.7,acceptableMissingValues=5):
     print(f'The number of invalid entries remaing in the dataset is {xSamplesRemoved.size - xSamplesRemoved.count()}\nThat is {(xSamplesRemoved.size - xSamplesRemoved.count())/xSamplesRemoved.size} parts of the whole dataset')
     
     # Removing outliers
-    yOutliersRemoved, xOutliersRemoved = detectOutliers(ySamplesRemoved,xSamplesRemoved)
+    yOutliersRemoved, xOutliersRemoved = detectOutliers(ySamplesRemoved,xSamplesRemoved,outlierThreshold)
 
     # Standardizing the data by subtraction of the mean and dividing by the standard deviation
     xStandardized = standardizeData(xOutliersRemoved)
@@ -561,7 +597,6 @@ def k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma, regressionFunction
     #print(f'The best test loss achieved  was {test_loss[best_loss_index]}')
     return np.mean(w,axis=0), np.mean(train_loss), np.mean(test_loss) # Returning the average parameters, training and testing losses
 
-
 ########## Making final predictions ##########
 
 def makePredictions(w,xTest,xHeader,xHeaderFeaturesRemoved, prior=1.0):
@@ -580,7 +615,6 @@ def makePredictions(w,xTest,xHeader,xHeaderFeaturesRemoved, prior=1.0):
     predictionSet = makeTrainingData(removedFeaturesX)
     probabilities = prior * logistic(predictionSet@w) # The prob of the model being applicable times the prob from the model
     return (np.sign(probabilities-0.5)+1)/2 # Shifting the probs to be negative for negative preds, and vice versa, taking the sign, shifting the preds up to be zero or two, diving by to so the preds are zero or one
-
 
 ######## Calculating some evaluation scores of our prediction #####################
 
@@ -650,7 +684,6 @@ def f1_score(Y,pred):
         Float number of the f1 score
     '''
     return 2 / ( ( 1/precision(Y,pred) ) + ( 1/recall(Y,pred)) )
-
 
 ########### Hyperparameter tuning ###########
 
