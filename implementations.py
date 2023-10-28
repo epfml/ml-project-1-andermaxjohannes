@@ -584,24 +584,74 @@ def makePredictions(w,xTest,xHeader,xHeaderFeaturesRemoved, prior=1.0):
 
 ######## Calculating the recall of our prediction #####################
 
-def calculate_recall(y_true, y_predicted):
-    ''' Function that calculates the recall of our prediction
+def truePositives(Y,pred):
+    ''' Function counting the number of true positives
     Args:
-        y_true: (N,2) array with the actuall data
-        y_predicted: (N,2) array with the predicted y's
+        Y: (N,) array of the true labels
+        pred: (N,) array of the predicted labels
     Returns:
-        a scalar that is the recall
+        Integer number of true positives
     '''
-    true_positives = 0
-    false_negatives = 0
-    for i in range(len(y_true)):
-        true_label = y_true[i, 1]
-        pred_label = y_predicted[i, 1]
-        if true_label == 1 and pred_label == 1:
-            true_positives += 1
-        elif true_label == 1 and pred_label == 0:
-            false_negatives += 1
-    return true_positives / (true_positives + false_negatives)
+    truePositivesArray = np.where(Y == pred,Y,0)
+    return np.sum(truePositivesArray)
+
+def falsePositives(Y,pred):
+    ''' Function counting the number of false positives
+    Args:
+        Y: (N,) array of the true labels
+        pred: (N,) array of the predicted labels
+    Returns:
+        Integer number of false positives
+    '''
+    falsePositivesArray = np.where(Y==pred,0,pred)
+    return np.sum(falsePositivesArray)
+
+def falseNegatives(Y,pred):
+    ''' Function counting the number of false negatives
+    Args:
+        Y: (N,) array of the true labels
+        pred: (N,) array of the predicted labels
+    Returns:
+        Integer number of false negatives
+    '''
+    falseNegativesArray = 1 - np.where(Y==pred,1,pred)
+    return np.sum(falseNegativesArray)
+
+def precision(Y,pred):
+    ''' Function calculating the precision
+    Args:
+        Y: (N,) array of the true labels
+        pred: (N,) array of the predicted labels
+    Returns:
+        Float number of the precision
+    '''
+    TP = truePositives(Y,pred)
+    FP = falsePositives(Y,pred)
+    return TP/(TP+FP)
+
+def recall(Y,pred):
+    ''' Function calculating the recall
+    Args:
+        Y: (N,) array of the true labels
+        pred: (N,) array of the predicted labels
+    Returns:
+        Float number of the recall
+    '''
+    TP = truePositives(Y,pred)
+    FN = falseNegatives(Y,pred)
+    return TP/(TP+FN)
+
+def f1_score(Y,pred):
+    ''' Function calculating the f1 score
+    Args:
+        Y: (N,) array of the true labels
+        pred: (N,) array of the predicted labels
+    Returns:
+        Float number of the f1 score
+    '''
+    return 2 / ( ( 1/precision(Y,pred) ) + ( 1/recall(Y,pred)) )
+
+
 ########### Hyperparameter tuning ###########
 
 def determineLambda(y,tx,initial_w,lambdas, max_iters, K, gamma):
