@@ -4,17 +4,22 @@ import helpers as h
 from implementations import *
 import matplotlib.pyplot as plt
 
+# Setting a random seed
+seed = 934586
+np.random.seed(seed)
 
 #### Setting some hyperparameters ########
 K = 5
 gamma = 0.01
 max_iter = 200
+featureThreshold = 0.7
+acceptableMissingValues = 5
 
 # Loading the data
 X, xHeader, Y, yHeader, indexedX, indexedXheader, indexedY, indexedYheader = loadTrainingData()
 print('')
 # Cleaning/feature engineering the data
-yClean, xClean, xHeaderClean, removedFeatures = dataCleaning(Y,X,xHeader)
+yClean, xClean, xHeaderClean, removedFeatures = dataCleaning(Y,X,xHeader,featureThreshold,acceptableMissingValues)
 print('')
 # Making a balanced data set to force the model to not just predict negatively all the time
 yBalanced, xBalanced, balancePrior = balanceData(yClean,xClean)
@@ -39,8 +44,8 @@ plt.legend()
 plt.show()
 
 # Training a model with logistic regression, with the chosen lambda
-reg_logistic_regression_fixed_lambda = lambda y, tx, initial_w, max_iters, gamma: reg_logistic_regression(y,tx,bestLambda,initial_w,max_iters,gamma)
-w_logistic, train_loss_logistic, test_loss_logistic = k_fold_cross_validation(yBalanced,tx,K,initial_w,max_iter,gamma,regressionFunction=reg_logistic_regression_fixed_lambda)
+#reg_logistic_regression_fixed_lambda = lambda y, tx, initial_w, max_iters, gamma: reg_logistic_regression(y,tx,bestLambda,initial_w,max_iters,gamma)
+#w_logistic, train_loss_logistic, test_loss_logistic = k_fold_cross_validation(yBalanced,tx,K,initial_w,max_iter,gamma,regressionFunction=reg_logistic_regression_fixed_lambda)
 
 
 ############## Making predictions ###############
@@ -49,10 +54,10 @@ xTest, xIndexedHeader = loadData('./Data/x_test.csv')
 print(xTest.shape)
 
 # Making predictions
-pred_logistic = makePredictions(w_logistic,xTest[:,1:],xHeader,xHeaderClean)
+pred_logistic = makePredictions(best_w,xTest[:,1:],xHeader,xHeaderClean)
 # Counting predicted positive cases
 print(f'The model predicts {np.sum(pred_logistic)} positive cases')
 
 # Converting the predictions from 0/1 to -1/1, and making a prediction file ready for submission
 pred_logistic[pred_logistic == 0] = -1
-h.create_csv_submission(xTest[:,0],pred_logistic,'./Predictions/regularized1.csv')
+h.create_csv_submission(xTest[:,0], pred_logistic, f'./Predictions/regularizedLogistic_seed_{seed}_gamma_{gamma}_iter_{max_iter}_K_{K}_featShold_{featureThreshold}_missVals_{acceptableMissingValues}.csv')
