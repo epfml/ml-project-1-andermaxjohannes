@@ -18,7 +18,7 @@ def MSE(e):
         e: (N,) array of the error fr all N predictions
     Returns:
         Float value of the mean squared error'''
-    return e.T @ e / len(e)
+    return e.T @ e / (2*len(e))
     
 def compute_loss(y, tx, w, lossFunction=MSE):
     """Calculate the loss using either MSE or MAE.
