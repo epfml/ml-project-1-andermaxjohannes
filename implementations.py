@@ -582,7 +582,7 @@ def makePredictions(w,xTest,xHeader,xHeaderFeaturesRemoved, prior=1.0):
     return (np.sign(probabilities-0.5)+1)/2 # Shifting the probs to be negative for negative preds, and vice versa, taking the sign, shifting the preds up to be zero or two, diving by to so the preds are zero or one
 
 
-######## Calculating the recall of our prediction #####################
+######## Calculating some evaluation scores of our prediction #####################
 
 def truePositives(Y,pred):
     ''' Function counting the number of true positives
@@ -592,7 +592,7 @@ def truePositives(Y,pred):
     Returns:
         Integer number of true positives
     '''
-    truePositivesArray = np.where(Y == pred,Y,0)
+    truePositivesArray = np.where(Y == pred, Y, 0)
     return np.sum(truePositivesArray)
 
 def falsePositives(Y,pred):
@@ -614,7 +614,7 @@ def falseNegatives(Y,pred):
     Returns:
         Integer number of false negatives
     '''
-    falseNegativesArray = 1 - np.where(Y==pred,1,pred)
+    falseNegativesArray = np.where(Y!=pred,Y,0)
     return np.sum(falseNegativesArray)
 
 def precision(Y,pred):

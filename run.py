@@ -9,11 +9,14 @@ seed = 934586
 np.random.seed(seed)
 
 #### Setting some hyperparameters ########
-K = 5
-gamma = 0.01
-max_iter = 200
-featureThreshold = 0.7
-acceptableMissingValues = 5
+K = 5                          # The number of folds for cross validation
+gamma = 0.1                    # The step size for the numerical regressions
+max_iter = 100                  # The maximum number of iterations for the numerical regressions
+featureThreshold = 0.7          # The percent of each feature that must be valid for the feature not to be discarded
+acceptableMissingValues = 5    # The number of invalid values a sample may have without being discarded
+
+# Making a filename to save the predictions for these parameters to
+savefile = f'./Predictions/regularizedLogistic_seed_{seed}_gamma_{gamma}_iter_{max_iter}_K_{K}_featShold_{featureThreshold}_missVals_{acceptableMissingValues}.csv'
 
 # Loading the data
 X, xHeader, Y, yHeader, indexedX, indexedXheader, indexedY, indexedYheader = loadTrainingData()
