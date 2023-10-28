@@ -238,10 +238,11 @@ def logistic_loss(y, tx, w):
     Returns:
         float non-negative loss
     '''
+    return np.sum(-y * (tx@w) + np.log(1+np.exp(tx@w))) / y.shape[0]
     #return np.sum(np.log( 1 + np.exp(-y * (tx@w))))
-    first_term = y.T@np.log(logistic(tx@w))
-    log_term = (1-y).T@np.log(1-logistic(tx@w))
-    return -np.sum(first_term+log_term) / y.shape[0]
+    #first_term = y.T@np.log(logistic(tx@w))
+    #log_term = (1-y).T@np.log(1-logistic(tx@w))
+    #return -np.sum(first_term+log_term) / y.shape[0]
     #return - np.sum( y * np.log(logistic(tx @ w)) + (1-y)* np.log(1-logistic(tx @ w)) ) / y.shape[0]
 
 def logistic_gradient(y, tx, w):
@@ -575,7 +576,8 @@ def k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma,lambda_,batch_size,
             w[k], train_loss[k] = regressionFunction(y_k, tx_k, initial_w, max_iters, gamma)
             
         elif regressionFunction == ridge_regression:
-            w[k], train_loss[k] = regressionFunction(y_k, tx_k, gamma)
+            w[k], train_loss[k] = regressionFunction(y_k, tx_k, lambda_)
+
         elif regressionFunction == reg_logistic_regression:
             w[k], train_loss[k] = regressionFunction(y_k, tx_k,lambda_, initial_w, max_iters, gamma)
 
@@ -634,15 +636,22 @@ def calculate_recall(y_true, y_predicted):
     Returns:
         a scalar that is the recall
     '''
-    true_positives = 0
-    false_negatives = 0
-    for i in range(len(y_true)):
+    #true_positives = 0
+    #false_negatives = 0
+    true_positivesArr = np.where(y_true==y_predicted,y_true,0)
+    false_negativesArr = np.where(y_true!=y_predicted,y_true,0)
+    true_positives = np.sum(true_positivesArr)
+    false_negatives = np.sum(false_negativesArr)
+    '''     
+    for i in range(len(y_true)-1):
         true_label = y_true[i]
         pred_label = y_predicted[i]
         if true_label == 1 and pred_label == 1:
             true_positives += 1
         elif true_label == 1 and pred_label == 0:
             false_negatives += 1
+    '''
+
     return true_positives / (true_positives + false_negatives)
 
 def precision(y_true, y_predicted):
@@ -653,16 +662,25 @@ def precision(y_true, y_predicted):
     Returns:
         a scalar that is the precision
     '''
+    true_positivesArr = np.where(y_true==y_predicted,y_true,0)
+    false_positvesArr = np.where(y_true==y_predicted,0,y_predicted)
+
+    true_positives = np.sum(true_positivesArr)
+    false_positives = np.sum(false_positvesArr)
+
+    '''
     true_positives = 0
     false_positives = 0
-    for i in range(len(y_true)):
+    for i in range(len(y_true)-1):
         true_label = y_true[i]
         pred_label = y_predicted[i]
         if true_label == 1 and pred_label == 1:
             true_positives += 1
         elif true_label == 0 and pred_label == 1:
             false_positives += 1
+    '''
     return true_positives / (true_positives + false_positives)
+
 def f1_score(y_true, y_predicted):
     ''' Function that calculates the f1 score of our prediction
     Args:
@@ -675,14 +693,31 @@ def f1_score(y_true, y_predicted):
     rec = calculate_recall(y_true, y_predicted)
     return 2 * (prec * rec) / (prec + rec), prec, rec
 
-def determineLambda(y,tx,initial_w,lambdas):
+def determineLambda(y,tx,initial_w,lambdas, max_iters, K, gamma, batch_size):
+    ''' Function testing what lambda yields, on average, the best result with k cross validation
+    Args:
+        y: (N,) array of the labels
+        tx: (N,d) array of the data and its features
+        initital_w: (d,) array with some initialization of the parameters
+        lambdas: (l,) array of l different lambdas
+        max_iters: integer, maximum number of iterations
+        K: integer, number of folds
+        gamma: float, step size
+    Returns:
+        train_loss: (l,) array of the average training losses for each lambda
+        test_loss: (l,) array of the average training losses for each lambda
+        best_lambda: float, the lambda giving the smallest test loss
+        best_w: (d,) array of the parameters giving the smallest test loss
+    '''
+    # Initializing the parameters, and arrays to store testing and training losses
     w_reg_logistic = np.zeros((len(lambdas),len(initial_w)),dtype=float)
     test_loss, train_loss = np.zeros(len(lambdas)), np.zeros(len(lambdas))
-    for i,l in enumerate(lambdas):
+
+    for i,l in enumerate(lambdas): # Iterating over the provided lambdas
+        # Making a regularized regression function with a fixed lambda that takes in 
+        # only (y, tx, initial_w, max_iters, gamma), which is what is required by our k_fold_cross_validation function
         reg_logistic_regression_fixed_lambda = lambda y, tx, initial_w, max_iters, gamma: reg_logistic_regression(y,tx,l,initial_w,max_iters,gamma)
-    
-        w_reg_logistic[i], train_loss[i], test_loss[i] = k_fold_cross_validation(y,tx,K,initial_w,max_iter,gamma,reg_logistic_regression_fixed_lambda)
-    bestLambdaIndex = np.argmin(test_loss)
-    return train_loss, test_loss, lambdas[bestLambdaIndex]
-
-
+        # Performing the cross validation and saving the average parameters, training and testing losses
+        w_reg_logistic[i], train_loss[i], test_loss[i] = k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma,reg_logistic_regression_fixed_lambda, batch_size=batch_size)
+    bestLambdaIndex = np.argmin(test_loss) # Finding for which lambda the best testing loss was acquired
+    return train_loss, test_loss, lambdas[bestLambdaIndex], w_reg_logistic[bestLambdaIndex]
