@@ -11,9 +11,9 @@ np.random.seed(seed)
 #### Setting some hyperparameters ########
 K = 5                          # The number of folds for cross validation
 gamma = 0.1                    # The step size for the numerical regressions
-max_iter = 100                  # The maximum number of iterations for the numerical regressions
+max_iter = 1000                  # The maximum number of iterations for the numerical regressions
 featureThreshold = 0.7          # The percent of each feature that must be valid for the feature not to be discarded
-acceptableMissingValues = 5    # The number of invalid values a sample may have without being discarded
+acceptableMissingValues = 3    # The number of invalid values a sample may have without being discarded
 
 # Making a filename to save the predictions for these parameters to
 savefile = f'./Predictions/regularizedLogistic_seed_{seed}_gamma_{gamma}_iter_{max_iter}_K_{K}_featShold_{featureThreshold}_missVals_{acceptableMissingValues}.csv'
@@ -35,7 +35,7 @@ print(f'The resultant dataarray tx has shape {tx.shape}')
 initial_w = np.zeros(tx.shape[1])
 
 # Setting some lambdas to check for the best among them
-lambdas = np.logspace(-1,-0.5,10)
+lambdas = np.logspace(-3,-1,10)
 # Looking for the best of the chosen lambdas
 train_loss, test_loss, bestLambda, best_w = determineLambda(yBalanced,tx,initial_w,lambdas,max_iter,K,gamma)
 
@@ -46,10 +46,8 @@ plt.xscale('log')
 plt.legend()
 plt.show()
 
-# Training a model with logistic regression, with the chosen lambda
-#reg_logistic_regression_fixed_lambda = lambda y, tx, initial_w, max_iters, gamma: reg_logistic_regression(y,tx,bestLambda,initial_w,max_iters,gamma)
-#w_logistic, train_loss_logistic, test_loss_logistic = k_fold_cross_validation(yBalanced,tx,K,initial_w,max_iter,gamma,regressionFunction=reg_logistic_regression_fixed_lambda)
-
+train_predictions_best_w = makePredictions(best_w,X,xHeader,xHeaderClean)
+f1_best_w = f1_score(Y,train_predictions_best_w)
 
 ############## Making predictions ###############
 # Loading the test data
@@ -60,7 +58,11 @@ print(xTest.shape)
 pred_logistic = makePredictions(best_w,xTest[:,1:],xHeader,xHeaderClean)
 # Counting predicted positive cases
 print(f'The model predicts {np.sum(pred_logistic)} positive cases')
+savePrediction = (input('Do you want to save this prediction? [y/n]') == 'y')
 
-# Converting the predictions from 0/1 to -1/1, and making a prediction file ready for submission
-pred_logistic[pred_logistic == 0] = -1
-h.create_csv_submission(xTest[:,0], pred_logistic, f'./Predictions/regularizedLogistic_seed_{seed}_gamma_{gamma}_iter_{max_iter}_K_{K}_featShold_{featureThreshold}_missVals_{acceptableMissingValues}.csv')
+if savePrediction:
+    # Converting the predictions from 0/1 to -1/1, and making a prediction file ready for submission
+    pred_logistic[pred_logistic == 0] = -1
+    h.create_csv_submission(xTest[:,0], pred_logistic, f'./Predictions/regularizedLogistic_seed_{seed}_gamma_{gamma}_iter_{max_iter}_K_{K}_featShold_{featureThreshold}_missVals_{acceptableMissingValues}.csv')
+else:
+    print('Did not save the prediction')
