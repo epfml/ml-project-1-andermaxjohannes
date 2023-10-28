@@ -18,7 +18,7 @@ def MSE(e):
         e: (N,) array of the error fr all N predictions
     Returns:
         Float value of the mean squared error'''
-    return e.T @ e / len(e)
+    return e.T @ e / 2*len(e)
 
 """
 def MAE(e): # Not used for now at least
@@ -423,7 +423,7 @@ def standardizeData(x):
     '''
     return (x - np.mean(x, axis=0)) / np.std(x, axis=0) # Subtract the mean and divide by the standard deviation
 
-def balanceData(y,x):
+def balanceData(y,x, factor=1):
     ''' Function for balancing the number of positive and negative cases in the dataset for regression, which may help find real correlations instead of just guessing based on the prior
     Args:
         y: (N,) array with labels
@@ -444,13 +444,13 @@ def balanceData(y,x):
     smallestSubsetLength = casesLengths[smallestSubset]
 
     # Storing the cases from the smallest subset in an array
-    balancedY = np.zeros(smallestSubsetLength*2)
-    balancedX = np.zeros((smallestSubsetLength*2,x.shape[1]))
+    balancedY = np.zeros(smallestSubsetLength*(1+factor))
+    balancedX = np.zeros((smallestSubsetLength*(1+factor),x.shape[1]))
     balancedY[:smallestSubsetLength] = (y[casesIndices[smallestSubset]]).flatten()
     balancedX[:smallestSubsetLength] = x[casesIndices[smallestSubset]]
 
     # Randomly choosing as many samples from the largest subset as there are in the smallest subset, and storing them in the balanced array
-    randomSampleIndices = np.random.permutation(casesLengths[largestSubset])[:smallestSubsetLength]
+    randomSampleIndices = np.random.permutation(casesLengths[largestSubset])[:factor*smallestSubsetLength]
     balancedX[smallestSubsetLength:] = (x[casesIndices[largestSubset]])[randomSampleIndices]
     balancedY[smallestSubsetLength:] = ((y[casesIndices[largestSubset]])[randomSampleIndices]).flatten()
 
