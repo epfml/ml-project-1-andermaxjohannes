@@ -73,7 +73,7 @@ def mean_squared_error_gd(y, tx, initial_w, max_iters, gamma): # Required functi
         grad = compute_mse_gradient(y,tx,w) * gamma # Updating w by a step in the negative gradient direction at the current w
         w -= grad
         #print(f'w: {w}, grad: {grad}')
-
+    #print(w.shape,y.shape,tx.shape)
     return w, compute_loss(y,tx,w) # Returning the final loss and the final parameters
 
 def mse_gd_momentum(y, tx, initial_w, max_iters, gamma, beta=0.5):
@@ -97,7 +97,7 @@ def mse_gd_momentum(y, tx, initial_w, max_iters, gamma, beta=0.5):
         m = beta * m + (1-beta) * compute_mse_gradient(y,tx,w) # Weighted average of the former momentum and current gradient
         w -= m * gamma # Updating w by a step in the negative momentum direction
 
-    return w, compute_loss(y,tx,w) # Returning the final loss and the final parameters
+    return w , compute_loss(y,tx,w) # Returning the final loss and the final parameters
 
 
 
@@ -130,7 +130,7 @@ def mini_batch(y,tx,B):
     yBatch, txBatch = y[shuffledIndexes[0:B]], tx[shuffledIndexes[0:B]] # Extracts the samples of y and tx corresponding to the first B indices in our randomly permuted index array
     return yBatch, txBatch
 
-def mean_squared_error_sgd(y, tx, initial_w, max_iters, gamma, batch_size=1): # Required function #2
+def mean_squared_error_sgd(y, tx, initial_w, max_iters, gamma, batch_size): # Required function #2
     """The Stochastic Gradient Descent algorithm (SGD) for the mean square error
     Args:
         y: (N,) array with the labels
@@ -152,7 +152,7 @@ def mean_squared_error_sgd(y, tx, initial_w, max_iters, gamma, batch_size=1): # 
         
     return w, compute_loss(y,tx,w) # Returning the final loss and the final parameters
 
-def mse_sgd_momentum(y, tx, initial_w, max_iters, gamma, batch_size=1, beta=0.5):
+def mse_sgd_momentum(y, tx, initial_w, max_iters, gamma, batch_size, beta=0.5):
     """The Stochastic Gradient Descent algorithm (SGD) for the mean square error, but with momentum
     Args:
         y: (N,) array with the labels
@@ -523,14 +523,16 @@ def dataCleaning(y,x,xHeader,featureThreshold=0.7,acceptableMissingValues=5):
 ########## K Fold Cross Validation #########
 
 def k_fold_cross_validation_sets(y,x,K):
-    ''' Function for making K separate training sets out of the provided dataset
+    ''' Function for making K separate testing and training sets out of the provided dataset
     Args:
         y: (N,) array of the labels
         x: (N,d) array of the data with its features
         K: Integer number of separate trainingsets
     Yields:
-        y_k: (N/K,) array of the chosen labels. N/K is N//K + 1 for the first sets, and N//K for the rest of the sets
-        x_k: (N/K,d) array of the data
+        y_k_test: (N/K,) array of the chosen labels. N/K is N//K + 1 for the first sets, and N//K for the rest of the sets
+        x_k_test: (N/K,d) array of the data
+        y_k_train: (N * (K-1)/K,) array of the chosen labels
+        x_k_train: (N * (K-1)/K,d) array of the data
     '''
     N = len(y)      # Saving the number of samples as an integer
     batchSize = N // K  # Calculating the batch size
@@ -544,9 +546,12 @@ def k_fold_cross_validation_sets(y,x,K):
         else:
             indices_k = indices[residual+k*batchSize:residual+(k+1)*batchSize] # Indices of the elements for each k batch
         
-        yield y[indices_k], x[indices_k] # Yield returns the first set, and next time the function is called the code continues, so the for loop repeats and yields the next set
+        mask = np.ones(len(y), dtype=bool)  # Creating a mask to be able to extract the 
+        mask[indices_k] = False             # samples not specified by indices_k
+        
+        yield y[indices_k], x[indices_k], y[mask], x[mask]  # Yield returns the first set, and next time the function is called the code continues, so the for loop repeats and yields the next set
 
-def k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma, regressionFunction=logistic_regression, lossFunction=logistic_loss):
+def k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma,lambda_,batch_size, regressionFunction=logistic_regression, lossFunction=logistic_loss):
     ''' Performing regression on K separate subsets of the provided training set, and returning the average parameters
     Args:
         y: (N,) array of the labels
@@ -559,23 +564,44 @@ def k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma, regressionFunction
     Returns:
         w_avg: (d,) array of the resultant parameters averaged over the cross validation runs
     ''' 
-    crossValidationSets = k_fold_cross_validation_sets(y,tx,K)
-    
-    w, loss = np.zeros((K,tx.shape[1])), np.zeros(K)
+    crossValidationSets = k_fold_cross_validation_sets(y,tx,K) # Creating a generator of the cross validation sets
+
+    w, train_loss, test_loss = np.zeros((K,initial_w.size)), np.zeros(K), np.zeros(K)
+    #print(str(regressionFunction))
     
     for k in range(K):
-        y_k, tx_k = next(crossValidationSets)
-        if regressionFunction == ridge_regression:
-            w[k], loss[k] = regressionFunction(y_k, tx_k, gamma)
+        y_k_test, tx_k_test, y_k, tx_k = next(crossValidationSets)
+        if regressionFunction == mean_squared_error_gd:
+            w[k], train_loss[k] = regressionFunction(y_k, tx_k, initial_w, max_iters, gamma)
+            
+        elif regressionFunction == ridge_regression:
+            w[k], train_loss[k] = regressionFunction(y_k, tx_k, gamma)
+        elif regressionFunction == reg_logistic_regression:
+            w[k], train_loss[k] = regressionFunction(y_k, tx_k,lambda_, initial_w, max_iters, gamma)
+
+        elif regressionFunction == mse_sgd_momentum:
+            
+            w[k], train_loss[k] = regressionFunction(y_k, tx_k, initial_w, max_iters, gamma, batch_size=batch_size)
+            
+        elif regressionFunction == mean_squared_error_sgd:
+            #mean_squared_error_sgd(y, tx, initial_w, max_iters, gamma, batch_size=1)
+            w[k], train_loss[k] = regressionFunction(y_k, tx_k, initial_w, max_iters, gamma, batch_size)
+            
+        elif regressionFunction == mse_gd_momentum or regressionFunction == mean_squared_error_gd:
+            #(y, tx, initial_w, max_iters, gamma)
+            w[k], train_loss[k] = regressionFunction(y_k, tx_k, initial_w, max_iters, gamma)
+            
         else:
-            w[k], loss[k] = regressionFunction(y_k, tx_k, initial_w, max_iters, gamma)
+            w[k], train_loss[k] = regressionFunction(y_k, tx_k, initial_w, max_iters, gamma) #(y, tx, lambda_ ,initial_w, max_iters, gamma)
+
+        test_loss[k] = lossFunction(y_k_test,tx_k_test,w[k])
 
         print(f'Run {k+1} yielded a loss improvement from {lossFunction(y_k,tx_k,initial_w)} to {lossFunction(y_k,tx_k,w[k])}')
     w_avg = np.sum(w,axis=0) / K
     
     print(f'''-----------------------------------------------------------------------------------------
 Averaging the parameters, the loss improves from {lossFunction(y,tx,initial_w)} to {lossFunction(y,tx,w_avg)}''')
-    return w_avg, lossFunction(y_k,tx_k,initial_w)
+    return np.mean(w,axis=0), np.mean(train_loss), np.mean(test_loss) # Returning the average parameters, training and testing losses
 
 
 ########## Making final predictions ##########
@@ -586,7 +612,7 @@ def makePredictions(w,xTest,xHeader,xHeaderFeaturesRemoved, prior=1.0):
         w: (d,) array with the parameters
         x: (N,D) array with the data
         xHeader: (D,) array with all the features
-        xHeader: (d,) array with the features that are actually used
+        xHeaderFeaturesRemoved: (d,) array with the features that are actually used
         prior: float denoting the probability of a random sample being in the model training data
     Returns:
         (N,) boolean array of the predictions
@@ -611,10 +637,52 @@ def calculate_recall(y_true, y_predicted):
     true_positives = 0
     false_negatives = 0
     for i in range(len(y_true)):
-        true_label = y_true[i, 1]
-        pred_label = y_predicted[i, 1]
+        true_label = y_true[i]
+        pred_label = y_predicted[i]
         if true_label == 1 and pred_label == 1:
             true_positives += 1
         elif true_label == 1 and pred_label == 0:
             false_negatives += 1
     return true_positives / (true_positives + false_negatives)
+
+def precision(y_true, y_predicted):
+    ''' Function that calculates the precision of our prediction
+    Args:
+        y_true: (N,2) array with the actuall data
+        y_predicted: (N,2) array with the predicted y's
+    Returns:
+        a scalar that is the precision
+    '''
+    true_positives = 0
+    false_positives = 0
+    for i in range(len(y_true)):
+        true_label = y_true[i]
+        pred_label = y_predicted[i]
+        if true_label == 1 and pred_label == 1:
+            true_positives += 1
+        elif true_label == 0 and pred_label == 1:
+            false_positives += 1
+    return true_positives / (true_positives + false_positives)
+def f1_score(y_true, y_predicted):
+    ''' Function that calculates the f1 score of our prediction
+    Args:
+        y_true: (N,2) array with the actuall data
+        y_predicted: (N,2) array with the predicted y's
+    Returns:
+        a scalar that is the f1 score
+    '''
+    prec = precision(y_true, y_predicted)
+    rec = calculate_recall(y_true, y_predicted)
+    return 2 * (prec * rec) / (prec + rec), prec, rec
+
+def determineLambda(y,tx,initial_w,lambdas):
+    w_reg_logistic = np.zeros((len(lambdas),len(initial_w)),dtype=float)
+    test_loss, train_loss = np.zeros(len(lambdas)), np.zeros(len(lambdas))
+    for i,l in enumerate(lambdas):
+        reg_logistic_regression_fixed_lambda = lambda y, tx, initial_w, max_iters, gamma: reg_logistic_regression(y,tx,l,initial_w,max_iters,gamma)
+    
+        w_reg_logistic[i], train_loss[i], test_loss[i] = k_fold_cross_validation(y,tx,K,initial_w,max_iter,gamma,reg_logistic_regression_fixed_lambda)
+    bestLambdaIndex = np.argmin(test_loss)
+    return train_loss, test_loss, lambdas[bestLambdaIndex]
+
+
