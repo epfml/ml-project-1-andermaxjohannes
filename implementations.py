@@ -599,21 +599,20 @@ def k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma, regressionFunction
 
 ########## Making final predictions ##########
 
-def makePredictions(w,xTest,xHeader,xHeaderFeaturesRemoved, prior=1.0):
+def makePredictions(w,xTest,xHeader,xHeaderWithoutRemovedFeatures):
     ''' Function making predictions based on provided parameters and data
     Args:
         w: (d,) array with the parameters
         x: (N,D) array with the data
         xHeader: (D,) array with all the features
-        xHeader: (d,) array with the features that are actually used
-        prior: float denoting the probability of a random sample being in the model training data
+        xHeaderWithoutRemovedFeatures: (d,) array with the features that are actually used
     Returns:
         (N,) boolean array of the predictions
     '''
     standardX = standardizeData(xTest)
-    removedFeaturesX = standardX[:,np.nonzero(np.isin(xHeader, xHeaderFeaturesRemoved))[0]]
+    removedFeaturesX = standardX[:,np.nonzero(np.isin(xHeader, xHeaderWithoutRemovedFeatures))[0]]
     predictionSet = makeTrainingData(removedFeaturesX)
-    probabilities = prior * logistic(predictionSet@w) # The prob of the model being applicable times the prob from the model
+    probabilities = logistic(predictionSet@w) # The prob of the model being applicable times the prob from the model
     return (np.sign(probabilities-0.5)+1)/2 # Shifting the probs to be negative for negative preds, and vice versa, taking the sign, shifting the preds up to be zero or two, diving by to so the preds are zero or one
 
 ######## Calculating some evaluation scores of our prediction #####################
@@ -687,7 +686,7 @@ def f1_score(Y,pred):
 
 ########### Hyperparameter tuning ###########
 
-def determineLambda(y,tx,initial_w,lambdas, max_iters, K, gamma):
+def determineLambda(y,tx,initial_w,lambdas, max_iters, K, gamma,regressionFunction=reg_logistic_regression):
     ''' Function testing what lambda yields, on average, the best result with k cross validation
     Args:
         y: (N,) array of the labels
@@ -697,6 +696,7 @@ def determineLambda(y,tx,initial_w,lambdas, max_iters, K, gamma):
         max_iters: integer, maximum number of iterations
         K: integer, number of folds
         gamma: float, step size
+        regressionFunction: Function for performing the regression. Must take 6 arguments
     Returns:
         train_loss: (l,) array of the average training losses for each lambda
         test_loss: (l,) array of the average training losses for each lambda
@@ -710,7 +710,7 @@ def determineLambda(y,tx,initial_w,lambdas, max_iters, K, gamma):
     for i,l in enumerate(lambdas): # Iterating over the provided lambdas
         # Making a regularized regression function with a fixed lambda that takes in 
         # only (y, tx, initial_w, max_iters, gamma), which is what is required by our k_fold_cross_validation function
-        reg_logistic_regression_fixed_lambda = lambda y, tx, initial_w, max_iters, gamma: reg_logistic_regression(y,tx,l,initial_w,max_iters,gamma)
+        reg_logistic_regression_fixed_lambda = lambda y, tx, initial_w, max_iters, gamma: regressionFunction(y,tx,l,initial_w,max_iters,gamma)
         # Performing the cross validation and saving the average parameters, training and testing losses
         w_reg_logistic[i], train_loss[i], test_loss[i] = k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma,reg_logistic_regression_fixed_lambda)
     bestLambdaIndex = np.argmin(test_loss) # Finding for which lambda the best testing loss was acquired
