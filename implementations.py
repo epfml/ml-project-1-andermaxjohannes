@@ -424,7 +424,7 @@ def balanceData(y,x,ratio=1):
     smallestSubsetLength = casesLengths[smallestSubset]
 
     # Calculating the number of samples in the largest subset
-    largestSubsetLength = np.round(smallestSubsetLength * ratio)
+    largestSubsetLength = int(np.round(smallestSubsetLength * ratio))
 
     # Storing the cases from the smallest subset in an array
     balancedY = np.zeros(smallestSubsetLength+largestSubsetLength)
@@ -686,7 +686,7 @@ def f1_score(Y,pred):
 
 ########### Hyperparameter tuning ###########
 
-def determineLambda(y,tx,initial_w,lambdas, max_iters, K, gamma,regressionFunction=reg_logistic_regression):
+def determineLambda(y,tx,initial_w,lambdas, max_iters, K, gamma, regressionFunction=reg_logistic_regression):
     ''' Function testing what lambda yields, on average, the best result with k cross validation
     Args:
         y: (N,) array of the labels
