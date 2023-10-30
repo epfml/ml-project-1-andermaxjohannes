@@ -27,7 +27,7 @@ def compute_loss(y, tx, w, lossFunction=MSE):
         y: (N,) array with the labels
         tx: (N,d) array with the samples and their features
         w: (d,) array with the model parameters
-        lossFunction: The loss function of your choice. Defaults to mean square error
+        lossFunction: The loss function of your choice. Defaults to mean square error, but could also take MAE or other if implemented
     Returns:
         Float value of the loss, given the selected loss-function
     """
@@ -80,7 +80,7 @@ def mse_gd_momentum(y, tx, initial_w, max_iters, gamma, beta=0.5):
     """
     # Initializing w
     w = np.array(initial_w,dtype=float) # Making sure the array is a float array no matter the provided initialization
-    m = np.zeros(len(initial_w), dtype=float) # Initializing the momentum as the zero vector
+    m = np.zeros(len(initial_w), dtype=float) # Initializing the momentum as the zero vector of the same size as the parameter vector
 
     for n in range(max_iters):
         m = beta * m + (1-beta) * compute_mse_gradient(y,tx,w) # Weighted average of the former momentum and current gradient
@@ -148,7 +148,6 @@ def mse_sgd_momentum(y, tx, initial_w, max_iters, gamma, batch_size=1, beta=0.5)
         batch_y, batch_x = mini_batch(y,tx,batch_size) # Extracting a batch of x's and corresponding y's
         m = beta * m + (1-beta) * compute_mse_gradient(batch_y,batch_x,w) # Updating the momentum by a linear combination of the current gradient and the former step
         w -= gamma * m # Updating w by a step in the negative momentum direction
-        #print(f'{n+1}/{max_iters}: w: {w}')
         
     return w, compute_loss(y,tx,w) # Returning the final loss and the final parameters
 
@@ -163,7 +162,7 @@ def least_squares(y,tx): # Required function #3
         w: (d,) array with the optimal least squares parameters
         loss: Float denoting the least squares loss of the solution w
     '''
-    w = np.linalg.solve(tx.T@tx,tx.T@y)
+    w = np.linalg.solve(tx.T@tx,tx.T@y) # Solving the linear system by the normal equations
     return w, compute_loss(y,tx,w)
 
 ########## Ridge regression using normal equations ##########
@@ -185,7 +184,7 @@ def ridge_regression(y, tx, lambda_): # Required function #4
     (tx.T @ tx + n*lambda*I) @ beta^hat(lambda) = tx.T @ y
     where n =len(y), and I is the identity matrix
     """
-    w = np.linalg.solve(2 * len(y) * lambda_ * np.identity(tx.shape[1]) + tx.T@tx , tx.T@y)  # Computing w by way of the normal equations
+    w = np.linalg.solve(2*len(y)*lambda_*np.identity(tx.shape[1])+tx.T@tx , tx.T@y)  # Computing w by way of the normal equations
     return w, compute_loss(y,tx,w)
 
 ########## Logistic regression using gradient descent or SGD (y ∈ {0,1}) ##########
@@ -200,7 +199,7 @@ def logistic(z):
     return 1/(1+np.exp(-z))
 
 def logistic_loss(y, tx, w):
-    ''' Compute the cost by negative log likelihood.
+    ''' Compute the loss by negative log likelihood.
     Args:
         y: (N,) array with labels
         tx: (N,D) array with samples and their features
@@ -208,12 +207,7 @@ def logistic_loss(y, tx, w):
     Returns:
         float non-negative loss
     '''
-    return np.sum(-y * (tx@w) + np.log(1+np.exp(tx@w))) / y.shape[0]
-    #return np.sum(np.log( 1 + np.exp(-y * (tx@w))))
-    first_term = y.T@np.log(logistic(tx@w))
-    log_term = (1-y).T@np.log(1-logistic(tx@w))
-    return -np.sum(first_term+log_term) / y.shape[0]
-    #return - np.sum( y * np.log(logistic(tx @ w)) + (1-y)* np.log(1-logistic(tx @ w)) ) / y.shape[0]
+    return np.sum(-y * (tx@w) + np.log(1+np.exp(tx@w))) / y.shape[0] # Formula from lectures
 
 def logistic_gradient(y, tx, w):
     ''' Compute the gradient of the logistic loss
@@ -224,7 +218,7 @@ def logistic_gradient(y, tx, w):
     Returns:
         (D, 1) array with the gradient of the logistic loss with respect to the parameters
     '''
-    return tx.T @ (logistic(tx@w)-y) / y.shape[0]
+    return tx.T @ (logistic(tx@w)-y) / y.shape[0] # Took the derivative with respect to w_i, assembled Nabla w = (w_i)_{i}, and found a matrix representation
 
 def logistic_regression(y, tx, initial_w, max_iters, gamma):
     ''' Use logistic regression for binary clasification
@@ -240,7 +234,7 @@ def logistic_regression(y, tx, initial_w, max_iters, gamma):
     '''
     w = np.array(initial_w, dtype=float)
     for i in range(max_iters):
-        w -= gamma * logistic_gradient(y,tx,w)
+        w -= gamma * logistic_gradient(y,tx,w) # Updating by logistic gradient, similar to GD
     
     return w, logistic_loss(y,tx,w)
 
@@ -256,26 +250,7 @@ def penalized_logistic_loss(y, tx, w, lambda_):
     Returns:
         loss: float, penalized logistic loss
     '''
-    return logistic_loss(y, tx, w) + lambda_ * np.sum(w.T@w)
-
-def penalized_logistic_regression(y, tx, w, lambda_):
-    """return the loss and gradient.
-    Args:
-        y:  shape=(N, 1)
-        tx: shape=(N, D)
-        w:  shape=(D, 1)
-        lambda_: scalar
-    Returns:
-        loss: scalar number
-        gradient: shape=(D, 1)
-    """
-    grad = logistic_gradient(y,tx,w)
-    loss = logistic_loss(y,tx,w)
-    
-    loss_pen = loss+lambda_*np.sum(w.T@w)
-    grad_pen = grad+lambda_*np.abs(w)*2
-        
-    return loss_pen,grad_pen
+    return logistic_loss(y, tx, w) + lambda_ * np.sum(w.T@w) # Computes the logistic loss and adds the penalization term
 
 def reg_logistic_regression(y, tx, lambda_ ,initial_w, max_iters, gamma): # Required function #6
     ''' Perform regularized logistic regression for binary classification
@@ -293,29 +268,10 @@ def reg_logistic_regression(y, tx, lambda_ ,initial_w, max_iters, gamma): # Requ
     w = np.array(initial_w, dtype=float)
 
     for n in range(max_iters):
-        #loss_pen, grad_pen = penalized_logistic_regression(y, tx, w, lambda_)
         w -= gamma * (logistic_gradient(y,tx,w) + 2*lambda_*np.abs(w)) # Updating the paramters by the gradient with the regularization term
     
-    loss = logistic_loss(y,tx,w)
+    loss = logistic_loss(y,tx,w) # Computing the final logistic loss without the penalization term
     return w, loss
-
-def calculate_hessian(y, tx, w):
-    """ Return the Hessian of the loss function.
-    Args:
-        y:  (N, 1)
-        tx: (N, D)
-        w:  (D, 1)
-    Returns:
-        (D,D) array of the hessian matrix
-    logisticDiag = np.diag((logistic * (1-logistic)).flatten()) 
-    """
-    sig = logistic(tx@w)
-    
-    S = np.diag(sig-sig@sig.T)
-    
-    hess = (1/np.shape(y)[0])*(tx.T@np.diag(S)@tx)
-    
-    return hess
 
 ########## Loading data ##########
 
@@ -332,15 +288,15 @@ def loadData(dataPath):
     return data , header
 
 def loadTrainingData():
-    ''' Loads the medical training data and nothing else. Wrapper function
+    ''' Loads the medical training data and nothing else. Wrapper function. Returns the data, both with and without ids
     Returns:
         X, xHeader, Y, yHeader, indexedX, indexedXheader, indexedY, indexedYheader
     '''
-    x, xHeader = loadData('./Data/x_train.csv')
-    y, yHeader = loadData('./Data/y_train.csv')
-    y[y == -1] = 0
-    unIndexedX, unIndexedXHeader = x[:,1:], xHeader[1:]
-    unIndexedY, unIndexedYHeader = y[:,1:], yHeader[1:]
+    x, xHeader = loadData('./Data/x_train.csv') # Loading the data 
+    y, yHeader = loadData('./Data/y_train.csv') # Loading the data
+    y[y == -1] = 0  # Converting the data from -1 and 1 to 0 and 1
+    unIndexedX, unIndexedXHeader = x[:,1:], xHeader[1:] # Removing the ids
+    unIndexedY, unIndexedYHeader = y[:,1:], yHeader[1:] # Removing the ids
 
     print(f'Data successfully loaded, there are {unIndexedX.shape[1]} features and {y.shape[0]} samples, the shapes of the unindexed data is:\ny: {unIndexedY.shape}, x: {unIndexedX.shape}')
 
@@ -365,12 +321,12 @@ def removeBadFeatures(x,xHeader,threshold=0.7):
 
     # Finding the indices of all the features with number of features above and below a threeshold
     featureIndicesAboveThreeshold = np.argwhere(validFeatureValsPercent > threshold).flatten() # Finding the indices where there are more than threeshold percent valid entries
-    featureIndicesBeneathThreeshold = np.argwhere(validFeatureValsPercent < threshold).flatten()
+    featureIndicesBeneathThreeshold = np.argwhere(validFeatureValsPercent < threshold).flatten() # Finding the indices where there are less than threshold percent valid entries
 
     # Printing the good vs bad features
     print(f'For a threshold of {threshold}, there are {len(featureIndicesAboveThreeshold)} good features, and {x.shape[1]-len(featureIndicesAboveThreeshold)} bad features')
 
-    # Removing the features that appears less than {threeshold} of the time, and returning the others
+    # Removing the features that appears less than {threshold} of the time, and returning the others
     return x[:,featureIndicesAboveThreeshold], xHeader[featureIndicesAboveThreeshold], xHeader[featureIndicesBeneathThreeshold]
 
 def removeBadSamples(y,x,acceptableMissingValues):
@@ -407,7 +363,7 @@ def balanceData(y,x,ratio=1):
     Args:
         y: (N,) array with labels
         x: (N,d) array with data
-        ratio: float denoting the ratio between the positive and negative samples (1:ratio, positive:negative) (Assuming there are more positive than negative cases, its the opposite if not)
+        ratio: float denoting the ratio of positive:negative samples (1:ratio, positive:negative) (Assuming there are more negative than positive cases, its the opposite if not)
     Returns:
         (N_b,) array with labels, where N_b is min(positiveCase, negativeCases) * (1+ratio)
         (N_b,d) array with the balanced data
@@ -443,16 +399,14 @@ def balanceData(y,x,ratio=1):
     shuffledBalancedY = balancedY[shufflingIndices]
 
     print(f'Created a balanced subset of the data, with {smallestSubsetLength+largestSubsetLength} samples, {smallestSubsetLength} of positive and {largestSubsetLength} negative samples')
-    
-    ### Models trained from this dataset will overestimate the probability of positive (or negative) cases,
-    ### therefore we should use some bayesian probabilities to update probabilities
-    prior = 2*smallestSubsetLength/len(y) # The probability of a random sample being in the balanced data
     return shuffledBalancedY, shuffledBalancedX
 
 def makeTrainingData(x):
-    ''' Function filling the invalid values with the mean (zero), and adding a dummy variable'''
+    ''' Function filling the invalid values with the mean (zero), and adding a dummy variable
+    Args:
+        x: (N,d) array with the data'''
     xClean = np.ma.filled(x,fill_value=0) # Replace the invalid entries by zeros (aka the mean)
-    tx = np.c_[np.ones(xClean.shape[0]),xClean] # Adding a dummy feature
+    tx = np.c_[np.ones(xClean.shape[0]),xClean] # Adding a dummy feature (a column of ones)
     print('Added dummy variable and replaced invalid entries with zeros')
     return np.nan_to_num(tx) # For some reason, not all NaN values were filled with zeros, this should rectify that problem
 
@@ -472,9 +426,9 @@ def detectOutliers(y, x, outlierThreshold=10):
     # Assuming normal distribution, approx 68% of the data falls within 1 std, 95% within 2 std, 99.7% within 3 std
     # Therefore one may consider any entries in stdAwayFromMean > {outlierThreeshold=3} to be outliers 
     # - except that the data is not neccesarily normally distributed, so the threshold should be higher
-    inlierRows = np.where(np.all(stdAwayFromMean < outlierThreshold, axis=1))[0]
+    inlierRows = np.where(np.all(stdAwayFromMean < outlierThreshold, axis=1))[0] # Finding the rows that do not have outliers
     
-    outlierRows = np.where(np.any(stdAwayFromMean > outlierThreshold, axis=1))[0]
+    outlierRows = np.where(np.any(stdAwayFromMean > outlierThreshold, axis=1))[0] # Finding the rows that have outliers
 
     print(f'Removed {len(outlierRows)} samples with outliers more than {outlierThreshold} standard deviations from the mean. There remains {len(inlierRows)} samples in the dataset.')
 
@@ -485,27 +439,51 @@ def inspectData(x,threshold=0.7):
     Args:
         x: (N,d) array of the data
     '''
+    # Counting the number of entries in total, and then the number of valid entries
     dataSize = x.size
     validEntries = x.count()
 
+    # Counting the number of valid entries per feature, and dividing by the number of samples
     validFeatureVals = x.count(axis=0)
     validFeatureParts = validFeatureVals/x.shape[0]
 
     print(f'''Out of {dataSize} there are {validEntries} valid entries, that is {validEntries/dataSize} percent valid entries.''')
     
+    # Plotting the amount of valid entries per feature
+    plt.rcParams["figure.figsize"] = (30, 10)
     plt.bar(np.arange(0,validFeatureParts.shape[0]),validFeatureParts)
     plt.axhline(threshold, color='r')
+    plt.rc('font', size=22)
     plt.title('Parts valid entries per feature')
-    plt.show()
+    plt.xlabel('Feature')
+    plt.savefig('Figures/validInvalidEntriesPlot.png')
 
-    largestOutliers(x)
+    largestOutliers(x) # Finding and plotting the largest outlier per feature
 
 def largestOutliers(x):
+    ''' Function finding and plotting the largest outlier for each feature
+    Args:
+        x: (N,d) array of the data
+    '''
     stdAwayFromMean = np.abs(standardizeData(x))
     largestOutliers = np.max(stdAwayFromMean,axis=0)
     largestOutliersFilled = np.ma.filled(largestOutliers,fill_value=0)
     plt.bar(np.arange(0,x.shape[1]),largestOutliersFilled)
     plt.title('Largest Outlier for each Feature')
+    plt.xlabel('')
+    plt.savefig('Figures/largestOutliers.png')
+
+def plotParameters(w):
+    ''' Plots the sizes of the parameters in a bar chart
+    Args:
+        w: (d,) array of the parameters
+    '''
+    bottom_line = np.arange(w.shape[0])
+    featureSizes = np.abs(w)
+    plt.bar(bottom_line,featureSizes, width=0.1,ec='blue')
+    plt.xlabel('Feature')
+    plt.ylabel('Size of the associated parameter (w)')
+    plt.title('Parameter sizes')
     plt.show()
 
 def dataCleaning(y,x,xHeader,featureThreshold=0.7,acceptableMissingValues=5, outlierThreshold=10):
@@ -584,17 +562,14 @@ def k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma, regressionFunction
     ''' 
     crossValidationSets = k_fold_cross_validation_sets(y,tx,K) # Creating a generator of the cross validation sets
     
-    w, train_loss, test_loss = np.zeros((K,initial_w.size)), np.zeros(K), np.zeros(K)
+    w, train_loss, test_loss = np.zeros((K,initial_w.size)), np.zeros(K), np.zeros(K) # Initializing arrays for parameters, train and test loss for all folds
     
     for k in range(K):
-        y_k_test, tx_k_test, y_k_train, tx_k_train = next(crossValidationSets)
+        y_k_test, tx_k_test, y_k_train, tx_k_train = next(crossValidationSets)  # Generate the next (or first) crossvalidation set
 
-        w[k], train_loss[k] = regressionFunction(y_k_train, tx_k_train, initial_w, max_iters, gamma)
-        test_loss[k] = lossFunction(y_k_test,tx_k_test,w[k])
+        w[k], train_loss[k] = regressionFunction(y_k_train, tx_k_train, initial_w, max_iters, gamma) # Perform regression with the provided function
+        test_loss[k] = lossFunction(y_k_test,tx_k_test,w[k])    # Calculate the test loss for the current model
 
-    
-
-    #print(f'The best test loss achieved  was {test_loss[best_loss_index]}')
     return np.mean(w,axis=0), np.mean(train_loss), np.mean(test_loss) # Returning the average parameters, training and testing losses
 
 ########## Making final predictions ##########
@@ -609,10 +584,11 @@ def makePredictions(w,xTest,xHeader,xHeaderWithoutRemovedFeatures):
     Returns:
         (N,) boolean array of the predictions
     '''
-    standardX = standardizeData(xTest)
-    removedFeaturesX = standardX[:,np.nonzero(np.isin(xHeader, xHeaderWithoutRemovedFeatures))[0]]
-    predictionSet = makeTrainingData(removedFeaturesX)
-    probabilities = logistic(predictionSet@w) # The prob of the model being applicable times the prob from the model
+    # Passing the test data through the same cleaning as the training data, except that we remove the same features as for the training data instead of checking for valid/invalid entries in the testing data
+    standardX = standardizeData(xTest) # Standardizing
+    removedFeaturesX = standardX[:,np.nonzero(np.isin(xHeader, xHeaderWithoutRemovedFeatures))[0]] # Removing the same features from the testing data as was removed from the training data
+    predictionSet = makeTrainingData(removedFeaturesX)  # Adding dummy variable and filling invalid entries with zeros
+    probabilities = logistic(predictionSet@w) # Calculating the models predicted probabilities
     return (np.sign(probabilities-0.5)+1)/2 # Shifting the probs to be negative for negative preds, and vice versa, taking the sign, shifting the preds up to be zero or two, diving by to so the preds are zero or one
 
 ######## Calculating some evaluation scores of our prediction #####################
@@ -625,8 +601,8 @@ def truePositives(Y,pred):
     Returns:
         Integer number of true positives
     '''
-    truePositivesArray = np.where(Y == pred, Y, 0)
-    return np.sum(truePositivesArray)
+    truePositivesArray = np.where(Y == pred, Y, 0) # Isolating true positives as ones in an array, such that false positives, true and false negatives are zeros
+    return np.sum(truePositivesArray)   # Summing the true positives
 
 def falsePositives(Y,pred):
     ''' Function counting the number of false positives
@@ -636,7 +612,7 @@ def falsePositives(Y,pred):
     Returns:
         Integer number of false positives
     '''
-    falsePositivesArray = np.where(Y==pred,0,pred)
+    falsePositivesArray = np.where(Y==pred,0,pred) # Isolating false positives as ones in an array, such that true positives, true and false negatives are zeros
     return np.sum(falsePositivesArray)
 
 def falseNegatives(Y,pred):
@@ -647,7 +623,7 @@ def falseNegatives(Y,pred):
     Returns:
         Integer number of false negatives
     '''
-    falseNegativesArray = np.where(Y!=pred,Y,0)
+    falseNegativesArray = np.where(Y!=pred,Y,0) # Isolating false negatives as ones in an array, such that true and false positives, true negatives are zeros
     return np.sum(falseNegativesArray)
 
 def precision(Y,pred):
@@ -660,7 +636,7 @@ def precision(Y,pred):
     '''
     TP = truePositives(Y,pred)
     FP = falsePositives(Y,pred)
-    return TP/(TP+FP)
+    return TP/(TP+FP)   # Formula for precision
 
 def recall(Y,pred):
     ''' Function calculating the recall
@@ -672,7 +648,18 @@ def recall(Y,pred):
     '''
     TP = truePositives(Y,pred)
     FN = falseNegatives(Y,pred)
-    return TP/(TP+FN)
+    return TP/(TP+FN)   # Formula for recall
+
+def accuracy(Y,pred):
+    ''' Function calculating the accuracy of the model
+    Args:
+        Y: (N,) array of the true labels
+        pred: (N,) array of the predicted labels
+    Returns:
+        Float number of the accuracy
+    '''
+    correctPredictionsArray = np.where(Y==pred,1,0) # Isolating all true predictions as ones in an array, such that false predictions are zeros
+    return np.sum(correctPredictionsArray) / len(Y) # Summing and divinding by the total number of predictions
 
 def f1_score(Y,pred):
     ''' Function calculating the f1 score
@@ -682,7 +669,7 @@ def f1_score(Y,pred):
     Returns:
         Float number of the f1 score
     '''
-    return 2 / ( ( 1/precision(Y,pred) ) + ( 1/recall(Y,pred)) )
+    return 2 / ( ( 1/precision(Y,pred) ) + ( 1/recall(Y,pred)) ) # The harmonic mean of precision and recall
 
 ########### Hyperparameter tuning ###########
 
@@ -710,8 +697,23 @@ def determineLambda(y,tx,initial_w,lambdas, max_iters, K, gamma, regressionFunct
     for i,l in enumerate(lambdas): # Iterating over the provided lambdas
         # Making a regularized regression function with a fixed lambda that takes in 
         # only (y, tx, initial_w, max_iters, gamma), which is what is required by our k_fold_cross_validation function
-        reg_logistic_regression_fixed_lambda = lambda y, tx, initial_w, max_iters, gamma: regressionFunction(y,tx,l,initial_w,max_iters,gamma)
+        regression_fixed_lambda = lambda y, tx, initial_w, max_iters, gamma: regressionFunction(y,tx,l,initial_w,max_iters,gamma)
         # Performing the cross validation and saving the average parameters, training and testing losses
-        w_reg_logistic[i], train_loss[i], test_loss[i] = k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma,reg_logistic_regression_fixed_lambda)
+        w_reg_logistic[i], train_loss[i], test_loss[i] = k_fold_cross_validation(y,tx,K,initial_w,max_iters,gamma,regression_fixed_lambda)
     bestLambdaIndex = np.argmin(test_loss) # Finding for which lambda the best testing loss was acquired
     return train_loss, test_loss, lambdas[bestLambdaIndex], w_reg_logistic[bestLambdaIndex]
+
+def plotLossOverLambda(lambdas,train_loss,test_loss):
+    ''' Plotting the training and testing errors as functions of lambda 
+    Args: 
+        lambdas: (l,) array of the number of the regularization parameters tested
+        train_loss: (l,) array of the training losses for each lambda
+        test_loss: (l,) array of the testing losses for each lambda
+    '''
+    plt.plot(lambdas,train_loss,label='Training Loss', color='g')
+    plt.plot(lambdas,test_loss,label='Testing Loss', color='r')
+    plt.xscale('log')
+    plt.xlabel('Lambda')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.savefig('Figures/lambdaOptimization')
