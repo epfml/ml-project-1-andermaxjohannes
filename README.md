@@ -5,7 +5,7 @@
 The six required regression implementations can be found in implementations.py, along with all other implementations of different regression functions, data preprocessing, visualization, and general helper functions.
 
 ## Final predictions
-The code used to produce our final AICrowd submission with id #243813 is in run.ipynb, including the fixed random seed used for the prediction. The code saves the predictions in the folder Predictions.
+The code used to produce our final AICrowd submission with id #243813 is in run.ipynb, including the fixed random seed used for the prediction. The code saves the predictions in the folder Predictions. The AIcrowd submission id for our final/best prediction is #243813
 
 ## Data preprocessing
 As described in the code and in the report, the data preprocessing consists of first removing the features with less than 70% (or some other threshold) valid features. Then all the samples with more than five (or some other threshold) invalid entries were removed. These two steps ensure that the data we are working with is actually real data, and not just some filler values we have chosen.
