@@ -15,6 +15,9 @@ A dummy variable (a column of ones) is subsequently added.
 Then all remaining invalid values are replaced by zeros, which after the standardization is the mean.
 Finally, the dataset is balanced by selecting all the positive samples, and equally many negative samples. In practice we select more negative samples than positive, to clue the model in on the real base rate. For our final prediction we used 2.5 times as many negative samples as positive ones.
 
+## Cross validation
+Ideal lambda is found by cross validation, where we divide the training set into K folds, and train a regularized model on K-1 of the folds, test it on the Kth fold, averaging the testing losses, training losses, and parameters. Then we leave the next fold out, and train on the K-1 other folds, testing on the left out fold. So we go until all folds have been left out once. Then we repeat with a new lambda, and finally select the lambda that gave the smallest average testing loss.
+
 ## Where to place the data?
 To run the code, the data must be in the folder Data, and must be called x_test.csv, x_train.csv, and y_train.csv respectively.
 
